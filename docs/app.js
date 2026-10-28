@@ -5,6 +5,7 @@ const highlightsEl = document.getElementById("highlights");
 const statusEl = document.getElementById("status");
 const refreshEl = document.getElementById("refresh");
 const toastEl = document.getElementById("toast");
+const backToTopEl = document.getElementById("back-to-top");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
 const modeDescriptionEl = document.getElementById("mode-description");
 
@@ -43,6 +44,33 @@ let loading = false;
 let lastSnapshot = null;
 let toastTimer = null;
 let activeMode = "highs";
+
+const COLLAPSED_KEY = "stckcraw:collapsed";
+const collapsedGroups = loadCollapsedGroups();
+
+function loadCollapsedGroups() {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_KEY);
+    const keys = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(keys) ? keys : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function setCollapsed(key, collapsed) {
+  if (collapsed) {
+    collapsedGroups.add(key);
+  } else {
+    collapsedGroups.delete(key);
+  }
+
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedGroups]));
+  } catch {
+    // localStorage can be unavailable in private contexts.
+  }
+}
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => {
@@ -248,41 +276,75 @@ function renderGroup(group, index) {
 
   const items = Array.isArray(group.items) ? group.items : [];
   const leader = items[0];
+  const label = group.label || group.key;
+  const collapsed = collapsedGroups.has(group.key);
+  const bodyId = `group-body-${group.key}`;
+
+  if (collapsed) {
+    section.classList.add("collapsed");
+  }
 
   const head = document.createElement("div");
   head.className = "group-head";
   head.innerHTML = `
-    <h2>${escapeHTML(group.label || group.key)}</h2>
+    <h2>${escapeHTML(label)}</h2>
     <span class="group-count">${items.length} ativos</span>
     <span class="scroll-hint">deslize a tabela →</span>`;
+
   if (leader) {
     const leaderEl = document.createElement("span");
     leaderEl.className = "group-leader";
     leaderEl.innerHTML = `#1 <strong>${escapeHTML(leader.symbol)}</strong> ${formatPercent(leader.change)}`;
     head.appendChild(leaderEl);
   }
-  section.appendChild(head);
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "group-toggle";
+  toggle.setAttribute("aria-controls", bodyId);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${label}`);
+  toggle.title = toggle.getAttribute("aria-label");
+  toggle.innerHTML = '<span class="chevron" aria-hidden="true"></span>';
+  head.appendChild(toggle);
+
+  const body = document.createElement("div");
+  body.className = "group-body";
+  body.id = bodyId;
+  body.setAttribute("aria-hidden", String(collapsed));
+
+  const inner = document.createElement("div");
+  inner.className = "group-body-inner";
+  body.appendChild(inner);
+
+  toggle.addEventListener("click", () => {
+    const isCollapsed = section.classList.toggle("collapsed");
+    toggle.setAttribute("aria-expanded", String(!isCollapsed));
+    toggle.setAttribute("aria-label", `${isCollapsed ? "Expandir" : "Recolher"} ${label}`);
+    toggle.title = toggle.getAttribute("aria-label");
+    body.setAttribute("aria-hidden", String(isCollapsed));
+    setCollapsed(group.key, isCollapsed);
+  });
 
   if (group.error) {
     const message = document.createElement("p");
     message.className = "error";
     message.textContent = group.error;
-    section.appendChild(message);
-    return section;
-  }
-
-  if (items.length === 0) {
+    inner.appendChild(message);
+  } else if (items.length === 0) {
     const message = document.createElement("p");
     message.className = "empty";
     message.textContent = "Sem dados para este filtro.";
-    section.appendChild(message);
-    return section;
+    inner.appendChild(message);
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    wrap.appendChild(buildTable(items));
+    inner.appendChild(wrap);
   }
 
-  const wrap = document.createElement("div");
-  wrap.className = "table-wrap";
-  wrap.appendChild(buildTable(items));
-  section.appendChild(wrap);
+  section.appendChild(head);
+  section.appendChild(body);
 
   return section;
 }
@@ -387,6 +449,20 @@ for (const button of modeButtons) {
     setMode(button.dataset.mode);
   });
 }
+
+function updateBackToTop() {
+  const visible = window.scrollY > 500;
+  backToTopEl.classList.toggle("show", visible);
+  backToTopEl.tabIndex = visible ? 0 : -1;
+}
+
+backToTopEl.addEventListener("click", () => {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+  window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+});
+
+window.addEventListener("scroll", updateBackToTop, { passive: true });
+updateBackToTop();
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
