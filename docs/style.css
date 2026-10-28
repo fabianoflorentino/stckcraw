@@ -139,6 +139,36 @@ h1 span {
   line-height: 1.55;
 }
 
+.disclaimer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 16px 0 0;
+  padding: 8px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: rgba(16, 27, 49, 0.72);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.disclaimer-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(89, 168, 255, 0.55);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-style: normal;
+}
+
 .hero-actions {
   display: flex;
   flex-direction: column;
