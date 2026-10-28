@@ -4,7 +4,7 @@ GOLANGCI_LINT?=golangci-lint
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS=-ldflags "-X github.com/fabianoflorentino/stckcraw/internal/cli.Version=$(VERSION)"
 
-.PHONY: all build clean test test-short lint lint-fix fmt vet run download list dashboard preview help
+.PHONY: all build clean test test-short lint lint-fix fmt vet run download list dashboard preview docker-build docker-up docker-down docker-reset docker-logs help
 
 all: clean lint test build
 
@@ -67,6 +67,26 @@ dashboard: build
 ## preview: Serve docs locally on http://localhost:8000
 preview:
 	python3 -m http.server -d docs 8000
+
+## docker-build: Build the local dashboard image
+docker-build:
+	docker compose build
+
+## docker-up: Run the local 30-minute dashboard on http://localhost:8080
+docker-up:
+	docker compose up --build -d
+
+## docker-down: Stop the local dashboard stack
+docker-down:
+	docker compose down
+
+## docker-reset: Stop the stack and remove the data volume
+docker-reset:
+	docker compose down -v
+
+## docker-logs: Follow the dashboard updater logs
+docker-logs:
+	docker compose logs -f dashboard
 
 ## help: Show this help message
 help:

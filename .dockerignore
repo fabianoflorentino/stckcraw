@@ -1,0 +1,12 @@
+.git
+.github
+.agents
+.claude
+bin
+coverage.out
+coverage.html
+docs
+data
+tmp
+*.log
+skills-lock.json
