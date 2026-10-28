@@ -83,6 +83,43 @@ func TestBuilderBuildsRankedGroups(t *testing.T) {
 	if items[0].MarketCap == nil || *items[0].MarketCap != 500_000_000_000 {
 		t.Errorf("MarketCap = %v", items[0].MarketCap)
 	}
+	if len(snapshot.Lows) != 1 || len(snapshot.Lows[0].Items) != 2 {
+		t.Errorf("lows = %+v", snapshot.Lows)
+	}
+}
+
+type recordingFetcher struct {
+	requests []brapi.ListRequest
+}
+
+func (f *recordingFetcher) Top(_ context.Context, req brapi.ListRequest) ([]brapi.Asset, error) {
+	f.requests = append(f.requests, req)
+	return []brapi.Asset{{Symbol: "PETR4", Close: 10, Change: 1}}, nil
+}
+
+func TestBuilderFetchesBothDirections(t *testing.T) {
+	t.Parallel()
+
+	fetcher := &recordingFetcher{}
+	builder, err := dashboard.NewBuilder(fetcher, dashboard.WithGroups([]brapi.Group{
+		{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"},
+	}))
+	if err != nil {
+		t.Fatalf("NewBuilder() error = %v", err)
+	}
+
+	if _, err := builder.Build(context.Background()); err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if len(fetcher.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(fetcher.requests))
+	}
+	if fetcher.requests[0].SortOrder != "desc" {
+		t.Errorf("first sort order = %q, want desc", fetcher.requests[0].SortOrder)
+	}
+	if fetcher.requests[1].SortOrder != "asc" {
+		t.Errorf("second sort order = %q, want asc", fetcher.requests[1].SortOrder)
+	}
 }
 
 func TestBuilderKeepsPartialResults(t *testing.T) {
@@ -118,6 +155,9 @@ func TestBuilderKeepsPartialResults(t *testing.T) {
 	}
 	if snapshot.Groups[1].Error == "" {
 		t.Error("second group error is empty, want failure message")
+	}
+	if snapshot.Lows[1].Error == "" {
+		t.Error("second low group error is empty, want failure message")
 	}
 }
 

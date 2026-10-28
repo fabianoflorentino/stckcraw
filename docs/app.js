@@ -5,6 +5,21 @@ const highlightsEl = document.getElementById("highlights");
 const statusEl = document.getElementById("status");
 const refreshEl = document.getElementById("refresh");
 const toastEl = document.getElementById("toast");
+const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
+const modeDescriptionEl = document.getElementById("mode-description");
+
+const MODES = {
+  highs: {
+    description: "Top 10 maiores altas do dia",
+    topLabel: "Maior alta",
+    coverage: "altas",
+  },
+  lows: {
+    description: "Top 10 maiores baixas do dia",
+    topLabel: "Maior queda",
+    coverage: "baixas",
+  },
+};
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -27,6 +42,7 @@ const percent = new Intl.NumberFormat("pt-BR", {
 let loading = false;
 let lastSnapshot = null;
 let toastTimer = null;
+let activeMode = "highs";
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => {
@@ -123,7 +139,7 @@ function highlightCard(label, value, meta, tone) {
   return card;
 }
 
-function renderHighlights(groups) {
+function renderHighlights(groups, mode) {
   const items = [];
   for (const group of groups) {
     for (const item of group.items || []) {
@@ -134,7 +150,9 @@ function renderHighlights(groups) {
   let topChange = null;
   let topVolume = null;
   for (const item of items) {
-    if (!topChange || item.change > topChange.change) {
+    if (!topChange) {
+      topChange = item;
+    } else if (mode === "lows" ? item.change < topChange.change : item.change > topChange.change) {
       topChange = item;
     }
     if (!topVolume || item.financialVolume > topVolume.financialVolume) {
@@ -142,9 +160,11 @@ function renderHighlights(groups) {
     }
   }
 
+  const config = MODES[mode] || MODES.highs;
+
   highlightsEl.replaceChildren(
     highlightCard(
-      "Maior alta",
+      config.topLabel,
       topChange ? topChange.symbol : "—",
       topChange
         ? `${topChange.group} · ${formatPercent(topChange.change)}`
@@ -162,7 +182,7 @@ function renderHighlights(groups) {
     highlightCard(
       "Cobertura",
       `${items.length} ativos`,
-      `${groups.length} grupos · top 10 por variação do dia`,
+      `${groups.length} grupos · top 10 ${config.coverage} do dia`,
       "neutral",
     ),
   );
@@ -274,15 +294,51 @@ function renderFatal(message) {
   groupsEl.replaceChildren(box);
 }
 
-function render(snapshot) {
-  const groups = Array.isArray(snapshot.groups) ? snapshot.groups : [];
-  lastSnapshot = snapshot;
+function renderActiveGroups() {
+  if (!lastSnapshot) {
+    return;
+  }
+
+  const groups = activeMode === "lows"
+    ? (Array.isArray(lastSnapshot.lows) ? lastSnapshot.lows : [])
+    : (Array.isArray(lastSnapshot.groups) ? lastSnapshot.groups : []);
 
   groupsEl.replaceChildren();
-  groups.forEach((group, index) => {
-    groupsEl.appendChild(renderGroup(group, index));
-  });
-  renderHighlights(groups);
+
+  if (groups.length === 0) {
+    const message = document.createElement("p");
+    message.className = "empty";
+    message.textContent = activeMode === "lows"
+      ? "Ainda não há dados de baixas. Aguarde a próxima atualização."
+      : "Sem dados para exibir.";
+    groupsEl.appendChild(message);
+  } else {
+    groups.forEach((group, index) => {
+      groupsEl.appendChild(renderGroup(group, index));
+    });
+  }
+
+  renderHighlights(groups, activeMode);
+}
+
+function setMode(mode) {
+  if (!MODES[mode] || mode === activeMode) {
+    return;
+  }
+
+  activeMode = mode;
+  for (const button of modeButtons) {
+    const isActive = button.dataset.mode === mode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  }
+  modeDescriptionEl.textContent = MODES[mode].description;
+  renderActiveGroups();
+}
+
+function render(snapshot) {
+  lastSnapshot = snapshot;
+  renderActiveGroups();
   updateStatus(snapshot);
 }
 
@@ -325,6 +381,12 @@ async function load({ manual = false } = {}) {
 refreshEl.addEventListener("click", () => {
   void load({ manual: true });
 });
+
+for (const button of modeButtons) {
+  button.addEventListener("click", () => {
+    setMode(button.dataset.mode);
+  });
+}
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {

@@ -49,6 +49,7 @@ type Snapshot struct {
 	Source      string    `json:"source"`
 	Limit       int       `json:"limit"`
 	Groups      []Group   `json:"groups"`
+	Lows        []Group   `json:"lows"`
 }
 
 // Builder assembles a Snapshot from a TopFetcher.
@@ -117,15 +118,17 @@ func NewBuilder(fetcher TopFetcher, opts ...Option) (*Builder, error) {
 	return builder, nil
 }
 
-// Build fetches every group. A failing group is recorded in the snapshot and
-// does not prevent the others from being published. Build only returns an
-// error when every group fails or the context is cancelled.
+// Build fetches the biggest gains and losses for every group. A failing
+// direction is recorded in the snapshot and does not prevent the other data
+// from being published. Build only returns an error when every query fails or
+// the context is cancelled.
 func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 	snapshot := Snapshot{
 		GeneratedAt: b.now().UTC(),
 		Source:      "brapi.dev",
 		Limit:       b.limit,
 		Groups:      make([]Group, 0, len(b.groups)),
+		Lows:        make([]Group, 0, len(b.groups)),
 	}
 
 	var (
@@ -138,28 +141,38 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 			return snapshot, err
 		}
 
-		assets, err := b.fetcher.Top(ctx, brapi.ListRequest{
-			Type:    group.Type,
-			SubType: group.SubType,
-			Limit:   b.limit * overFetchRate,
+		highs, highErr := b.fetcher.Top(ctx, brapi.ListRequest{
+			Type:      group.Type,
+			SubType:   group.SubType,
+			Limit:     b.limit * overFetchRate,
+			SortOrder: "desc",
 		})
-		if err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", group.Key, err))
-			snapshot.Groups = append(snapshot.Groups, Group{
-				Key:   group.Key,
-				Label: group.Label,
-				Items: []Item{},
-				Error: err.Error(),
-			})
-			continue
+		if err := ctx.Err(); err != nil {
+			return snapshot, err
 		}
 
-		snapshot.Groups = append(snapshot.Groups, Group{
-			Key:   group.Key,
-			Label: group.Label,
-			Items: b.items(assets, group),
+		lows, lowErr := b.fetcher.Top(ctx, brapi.ListRequest{
+			Type:      group.Type,
+			SubType:   group.SubType,
+			Limit:     b.limit * overFetchRate,
+			SortOrder: "asc",
 		})
-		successes++
+		if err := ctx.Err(); err != nil {
+			return snapshot, err
+		}
+
+		snapshot.Groups = append(snapshot.Groups, b.groupResult(group, highs, highErr))
+		snapshot.Lows = append(snapshot.Lows, b.groupResult(group, lows, lowErr))
+
+		if highErr == nil || lowErr == nil {
+			successes++
+		}
+		if highErr != nil {
+			failures = append(failures, fmt.Errorf("%s highs: %w", group.Key, highErr))
+		}
+		if lowErr != nil {
+			failures = append(failures, fmt.Errorf("%s lows: %w", group.Key, lowErr))
+		}
 	}
 
 	if successes == 0 {
@@ -167,6 +180,23 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 	}
 
 	return snapshot, nil
+}
+
+func (b *Builder) groupResult(group brapi.Group, assets []brapi.Asset, err error) Group {
+	if err != nil {
+		return Group{
+			Key:   group.Key,
+			Label: group.Label,
+			Items: []Item{},
+			Error: err.Error(),
+		}
+	}
+
+	return Group{
+		Key:   group.Key,
+		Label: group.Label,
+		Items: b.items(assets, group),
+	}
 }
 
 func (b *Builder) items(assets []brapi.Asset, group brapi.Group) []Item {

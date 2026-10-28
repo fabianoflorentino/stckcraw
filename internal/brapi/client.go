@@ -22,9 +22,10 @@ const defaultUserAgent = "stckcraw/1.0 (+https://github.com/fabianoflorentino/st
 
 // ListRequest describes one /quote/list query.
 type ListRequest struct {
-	Type    string
-	SubType string
-	Limit   int
+	Type      string
+	SubType   string
+	Limit     int
+	SortOrder string
 }
 
 // Asset is one row returned by /quote/list.
@@ -113,9 +114,17 @@ func (c *Client) Top(ctx context.Context, req ListRequest) ([]Asset, error) {
 		limit = 10
 	}
 
+	sortOrder := req.SortOrder
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+	if sortOrder != "asc" && sortOrder != "desc" {
+		return nil, fmt.Errorf("invalid sort order %q: want asc or desc", sortOrder)
+	}
+
 	query := url.Values{}
 	query.Set("sortBy", "change")
-	query.Set("sortOrder", "desc")
+	query.Set("sortOrder", sortOrder)
 	query.Set("limit", strconv.Itoa(limit))
 	query.Set("type", req.Type)
 	if req.SubType != "" {

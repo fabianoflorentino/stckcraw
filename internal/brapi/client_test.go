@@ -124,6 +124,43 @@ func TestNewClientValidation(t *testing.T) {
 	}
 }
 
+func TestTopUsesSortOrder(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("sortOrder"); got != "asc" {
+			t.Errorf("sortOrder = %q, want asc", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprint(w, `{"stocks":[]}`); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client, err := brapi.NewClient(brapi.WithBaseURL(server.URL))
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if _, err := client.Top(context.Background(), brapi.ListRequest{Type: "stock", SortOrder: "asc"}); err != nil {
+		t.Fatalf("Top() error = %v", err)
+	}
+}
+
+func TestTopRejectsInvalidSortOrder(t *testing.T) {
+	t.Parallel()
+
+	client, err := brapi.NewClient()
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if _, err := client.Top(context.Background(), brapi.ListRequest{Type: "stock", SortOrder: "sideways"}); err == nil {
+		t.Fatal("Top() error = nil, want error")
+	}
+}
+
 func TestGroups(t *testing.T) {
 	t.Parallel()
 

@@ -173,13 +173,19 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	if len(snapshot.Groups) != 6 {
 		t.Fatalf("groups = %d, want 6", len(snapshot.Groups))
 	}
+	if len(snapshot.Lows) != 6 {
+		t.Fatalf("lows = %d, want 6", len(snapshot.Lows))
+	}
 	if len(snapshot.Groups[0].Items) != 1 || snapshot.Groups[0].Items[0].Symbol != "PETR4" {
 		t.Errorf("unexpected first group: %+v", snapshot.Groups[0])
 	}
-	if got := requests.Load(); got != 6 {
-		t.Errorf("requests = %d, want 6", got)
+	if len(snapshot.Lows[0].Items) != 1 || snapshot.Lows[0].Items[0].Symbol != "PETR4" {
+		t.Errorf("unexpected first low group: %+v", snapshot.Lows[0])
 	}
-	if !strings.Contains(stdout.String(), "6 groups") {
+	if got := requests.Load(); got != 12 {
+		t.Errorf("requests = %d, want 12", got)
+	}
+	if !strings.Contains(stdout.String(), "6 altas, 6 baixas") {
 		t.Errorf("stdout = %q", stdout.String())
 	}
 }

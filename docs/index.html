@@ -6,7 +6,7 @@
   <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, atualizado a cada 30 minutos.">
   <meta name="theme-color" content="#0b1120">
   <title>Altas e Baixas · stckcraw</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -33,6 +33,14 @@
     </div>
   </header>
 
+  <section class="toolbar" aria-label="Direção da variação">
+    <div class="mode-switch" role="tablist" aria-label="Altas ou baixas">
+      <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
+      <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
+    </div>
+    <p id="mode-description" class="mode-description">Top 10 maiores altas do dia</p>
+  </section>
+
   <section id="highlights" class="highlights" aria-label="Destaques"></section>
   <main id="groups" class="groups" aria-live="polite"></main>
 
@@ -43,6 +51,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

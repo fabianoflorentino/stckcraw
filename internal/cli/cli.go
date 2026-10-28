@@ -316,18 +316,28 @@ func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) e
 		return fmt.Errorf("write dashboard: %w", err)
 	}
 
-	var failed int
-	for _, group := range snapshot.Groups {
-		if group.Error != "" {
-			failed++
-			writeFormat(stderr, "warn %-6s %s\n", group.Key, group.Error)
-			continue
-		}
-		writeFormat(stderr, "ok   %-6s %d items\n", group.Key, len(group.Items))
+	sections := []struct {
+		label  string
+		groups []dashboard.Group
+	}{
+		{label: "alta", groups: snapshot.Groups},
+		{label: "baixa", groups: snapshot.Lows},
 	}
 
-	writeFormat(stdout, "wrote %s (%d groups, %d failed, %s)\n",
-		path, len(snapshot.Groups), failed, snapshot.GeneratedAt.Format(time.RFC3339))
+	var failed int
+	for _, section := range sections {
+		for _, group := range section.groups {
+			if group.Error != "" {
+				failed++
+				writeFormat(stderr, "warn %s %-6s %s\n", section.label, group.Key, group.Error)
+				continue
+			}
+			writeFormat(stderr, "ok   %s %-6s %d items\n", section.label, group.Key, len(group.Items))
+		}
+	}
+
+	writeFormat(stdout, "wrote %s (%d altas, %d baixas, %d failed, %s)\n",
+		path, len(snapshot.Groups), len(snapshot.Lows), failed, snapshot.GeneratedAt.Format(time.RFC3339))
 
 	return nil
 }
