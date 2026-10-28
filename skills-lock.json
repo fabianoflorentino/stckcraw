@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "skills": {
+    "golang-benchmark": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-benchmark/SKILL.md",
+      "computedHash": "fe732d713cd75c298b59b7c641015c4cca0fc42e471c7bc29c21e197da3c6ac5"
+    },
+    "golang-cli": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-cli/SKILL.md",
+      "computedHash": "98a065177bd19f4e26e4c83c50bfbce646472371554c438cecb30dceb1fff3ed"
+    },
+    "golang-code-style": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-code-style/SKILL.md",
+      "computedHash": "768ed50b0873e6b32fb94d38c712ea118132d2f10a827ba1883eec627b2ae4f0"
+    },
+    "golang-concurrency": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-concurrency/SKILL.md",
+      "computedHash": "3b2385d18b9e8f080a5ac3d391d304636e6ba87601be99fd191af552916ab659"
+    },
+    "golang-context": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-context/SKILL.md",
+      "computedHash": "68e7244cf8c5a85a9979f090aba96fb2c95aacd4a1178aeae1fe2e75014d8f16"
+    },
+    "golang-continuous-integration": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-continuous-integration/SKILL.md",
+      "computedHash": "91378e3b1de654285c03a9e2f6f8e36ece946a7ce1bcaf2bbba7bbabe4686ce0"
+    },
+    "golang-data-structures": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-data-structures/SKILL.md",
+      "computedHash": "eb89e4bce89693f89e229b9393842d7c456d33163f6177a36050f45f0bd97ff9"
+    },
+    "golang-database": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-database/SKILL.md",
+      "computedHash": "34e236460fc76f0654d0efd4eedceea734dbcafabce29318390649f3b5c70f75"
+    },
+    "golang-dependency-injection": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-dependency-injection/SKILL.md",
+      "computedHash": "f7908f6ae75ebb1b71a6a6a189f609852c020a22fb318db33668e239babd8365"
+    },
+    "golang-dependency-management": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-dependency-management/SKILL.md",
+      "computedHash": "ee8a4b11c404eabb74403b831525307fddb4a80816a292003fcbfda6598b7b1c"
+    },
+    "golang-design-patterns": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-design-patterns/SKILL.md",
+      "computedHash": "9401cc1871e68c0a59dd3b5580abd9c216890f843125c24ceeaf1be4bd2a8fde"
+    },
+    "golang-documentation": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-documentation/SKILL.md",
+      "computedHash": "7d05d70f2b2602aeccbfe238c87ea124d8dcfd6af6ee411ed21ec0a7bbc23c00"
+    },
+    "golang-error-handling": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-error-handling/SKILL.md",
+      "computedHash": "1193ad206b018dbe9043fe2a09f2a9a338997e60520fa02d9013c75437ea533d"
+    },
+    "golang-google-wire": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-google-wire/SKILL.md",
+      "computedHash": "fefabe44b8fb9260735a1e8fbc2fa84bb67cf0c26e0d964636f4d7d207a28475"
+    },
+    "golang-gopls": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-gopls/SKILL.md",
+      "computedHash": "068612904ab734138851d24a21cc13cafb128137912d9f998a4ccd123d5f8522"
+    },
+    "golang-graphql": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-graphql/SKILL.md",
+      "computedHash": "e416f418c5bf40faf65bf33514c52b329dd98228461bbafd70e8365a67956813"
+    },
+    "golang-grpc": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-grpc/SKILL.md",
+      "computedHash": "38d038671002f76c8d8e0ad33c69e73d55a66a1e7bbd84976aa21ff21ffaa49b"
+    },
+    "golang-how-to": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-how-to/SKILL.md",
+      "computedHash": "64896b7db23c43ea43f7a787063a6cffefff6c6a918e59412edef6df6215a0c1"
+    },
+    "golang-lint": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-lint/SKILL.md",
+      "computedHash": "56c60a27aaeccd4864631eed900a244e4c5d8a961656671cd1e2108e19dec2cd"
+    },
+    "golang-modernize": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-modernize/SKILL.md",
+      "computedHash": "69855b44e96a160cfcf33b51553eb321515b5dd8bb059818f9ae18fc0fd22212"
+    },
+    "golang-naming": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-naming/SKILL.md",
+      "computedHash": "7e9bfc67f98be30a8a32ef6f683d20cba02304fe63745898c0d2085d1982a2b3"
+    },
+    "golang-observability": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-observability/SKILL.md",
+      "computedHash": "b8c8157d8f9ce0ce3f5f9937408033a0d60b579febf06d8ad5c6930ea31eff51"
+    },
+    "golang-performance": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-performance/SKILL.md",
+      "computedHash": "bdaf6f7d583b95cd0ff9bb3ff0992962dd8ee404daec705c86e62b3aee10fadf"
+    },
+    "golang-pitfalls-code-organization": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-code-organization/SKILL.md",
+      "computedHash": "1aedff9dfaaadd2e9ba24e728495ec9fd27c95f6a21eec2c8eb60556a39582db"
+    },
+    "golang-pitfalls-concurrency-foundations": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-concurrency-foundations/SKILL.md",
+      "computedHash": "d365a7a3e039c43acac40b71abcad2e19a5db2109b44b24f1f7872fa0c5f1910"
+    },
+    "golang-pitfalls-concurrency-practice": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-concurrency-practice/SKILL.md",
+      "computedHash": "22020e27f8f697c35b3dc7d602a35c89edc68fd33c30c9c49a8af3df5b3715c3"
+    },
+    "golang-pitfalls-control-structures": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-control-structures/SKILL.md",
+      "computedHash": "2bc50445c5af1b9e9f27eaccef11e8bff2da24dd716f56e477f0f3a79796015c"
+    },
+    "golang-pitfalls-data-types": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-data-types/SKILL.md",
+      "computedHash": "d119fa942de2e78060776cb77441d8e0ecc295772f5ff0eb5ac6d282f111621c"
+    },
+    "golang-pitfalls-error-handling": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-error-handling/SKILL.md",
+      "computedHash": "755d949bf3605aad94bdff4222e7488729ec79b1542509bc1885d615119463d7"
+    },
+    "golang-pitfalls-functions-methods": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-functions-methods/SKILL.md",
+      "computedHash": "3604f61c44bf62890a71db908d459fadac8dda35a9297cda881b2cbb3b4dedb3"
+    },
+    "golang-pitfalls-optimizations": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-optimizations/SKILL.md",
+      "computedHash": "a6b810948da8d39ca49fa0916da7fdf4ee18c366908dd4d7ad03925b9be59b2c"
+    },
+    "golang-pitfalls-standard-library": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-standard-library/SKILL.md",
+      "computedHash": "27f685a174f557dd7081d57ef134bceb51242962121e86d90aef118caa2fc5d3"
+    },
+    "golang-pitfalls-strings": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-strings/SKILL.md",
+      "computedHash": "05918efc7f954517b6ce42d761145fa3b477b93bce13382be84d050ed0a62c0d"
+    },
+    "golang-pitfalls-testing": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pitfalls-testing/SKILL.md",
+      "computedHash": "b7b4625ef7a94cc6fa78f06cfaf30c56374b82c0fce8078e6d9f4deb0e7f0b85"
+    },
+    "golang-pkg-go-dev": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-pkg-go-dev/SKILL.md",
+      "computedHash": "ec6465984d8dca6caa53f3d7fe0a037892513c6bb39576fbb1192cd4f1692ae6"
+    },
+    "golang-popular-libraries": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-popular-libraries/SKILL.md",
+      "computedHash": "cc7f3f7ffa70e8467c1f0cbcbd163b403357c435384a3b33565a49bbdc7986e1"
+    },
+    "golang-project-layout": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-project-layout/SKILL.md",
+      "computedHash": "4f1d1989ed2044e40d6b277456695639ac7ee7e7e6f91a6b7914b11989c9b672"
+    },
+    "golang-refactoring": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-refactoring/SKILL.md",
+      "computedHash": "b994e8eee3bbd04424b0c0bd055a67caddb14116ef81c605dcc3a448bbafd4a3"
+    },
+    "golang-rest": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-rest/SKILL.md",
+      "computedHash": "3ea06f9a4b326a68a2267027323b8c8b998618c9982e24321c6261a57858c202"
+    },
+    "golang-safety": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-safety/SKILL.md",
+      "computedHash": "428dbdbb3a57a6267cf71b7953725075ee72b97afd399ef113361f94055ab77e"
+    },
+    "golang-samber-do": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-do/SKILL.md",
+      "computedHash": "10936c6e6ac90b2d9ec122bd92ef447e5ac87226e9266e765955a33d75cf4f9f"
+    },
+    "golang-samber-hot": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-hot/SKILL.md",
+      "computedHash": "2f2901cf352764af122f4939fa55a891793eaf9d7ba2fc981d7ea2550aee604d"
+    },
+    "golang-samber-lo": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-lo/SKILL.md",
+      "computedHash": "6ed3339c34cbed6d20d02796507061e8cc14249cb4d0f0c4805ccc39e7d53859"
+    },
+    "golang-samber-mo": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-mo/SKILL.md",
+      "computedHash": "a65f6e9751e76fcb5a82a3297590a82969e3c4530c4bb4c8101e83ff1c9309e3"
+    },
+    "golang-samber-oops": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-oops/SKILL.md",
+      "computedHash": "7c6c832a939e31a4122404f43f9de0a8f85137c61d624e30d10631d5efc34490"
+    },
+    "golang-samber-ro": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-ro/SKILL.md",
+      "computedHash": "a80630ea750ad255843e5f607691be0d9697c9f540d1a2f4a7e474f19027e5e5"
+    },
+    "golang-samber-slog": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-samber-slog/SKILL.md",
+      "computedHash": "d73f9022b2dcb89b95652a723dd2ae809e51c6402c92721f4b0d59f8f249cb3a"
+    },
+    "golang-security": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-security/SKILL.md",
+      "computedHash": "2814048b7d226aff02d95823d42a961f7b894926fba15cef8a7aeced75a139a4"
+    },
+    "golang-spf13-cobra": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-spf13-cobra/SKILL.md",
+      "computedHash": "c7943c3b1aaba5a0f761032d15a7e96a71b41fc54caca2b13b9a3606e421bc45"
+    },
+    "golang-spf13-viper": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-spf13-viper/SKILL.md",
+      "computedHash": "7ac5571a05b8ad4e7c4443dd4df33ae7a3dbd65e0c5441fec2b2fb432a290e6d"
+    },
+    "golang-stay-updated": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-stay-updated/SKILL.md",
+      "computedHash": "393875292473c5d14babf18ed22b4435f34a37b220daf2edb04a2be1ba33d7c6"
+    },
+    "golang-stretchr-testify": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-stretchr-testify/SKILL.md",
+      "computedHash": "7471f95907f98930d3b184c161dcc9f7c72ec58aee56aa927957ea16b9fb08db"
+    },
+    "golang-structs-interfaces": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-structs-interfaces/SKILL.md",
+      "computedHash": "cc9ae66b4ecb6c31626a604d0406ec2c80a8c0cd241417b9e1cf9e4e313193e2"
+    },
+    "golang-swagger": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-swagger/SKILL.md",
+      "computedHash": "c4d65cdcd24dc49983066ebc2b5ac140be91dda3671c10027d536724c21adcbb"
+    },
+    "golang-testing": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-testing/SKILL.md",
+      "computedHash": "c44ce3978a8b942464f611275f2da47b17c05935aaf604e4e76a1883c24f7f0e"
+    },
+    "golang-troubleshooting": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-troubleshooting/SKILL.md",
+      "computedHash": "f43e087056de1bdeda01efd4cd02ccb4eb1289e37e58444b2a2dafa9bad7ff1c"
+    },
+    "golang-uber-dig": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-uber-dig/SKILL.md",
+      "computedHash": "9fd7fe7068eeb172b3d78d6c178175f7b6c06467146856cb1479e01ed2184ea5"
+    },
+    "golang-uber-fx": {
+      "source": "fabianoflorentino/golang-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/golang-uber-fx/SKILL.md",
+      "computedHash": "81723027f64b0da5e52e9888eadff83a82647dd66cffc08022710c4685902310"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, atualizado a cada 30 minutos.">
+  <title>Altas e Baixas · stckcraw</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">B3 · top 10 por variação do dia</p>
+      <h1>Altas e Baixas</h1>
+      <p class="subtitle">Ações, FIIs, FIPs, ETFs, BDRs e Units — atualizado a cada 30 minutos.</p>
+    </div>
+    <div class="hero-meta">
+      <p id="status" class="status" aria-live="polite">Carregando…</p>
+      <button id="refresh" type="button" class="refresh">Atualizar agora</button>
+    </div>
+  </header>
+
+  <main id="groups" class="groups" aria-live="polite"></main>
+
+  <footer class="footer">
+    <span>Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a></span>
+    <span>Dados informativos; não é recomendação de investimento.</span>
+  </footer>
+
+  <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
+  <script src="app.js"></script>
+</body>
+</html>

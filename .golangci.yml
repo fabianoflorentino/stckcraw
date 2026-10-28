@@ -1,0 +1,50 @@
+# golangci-lint v2 configuration for stckcraw.
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/fabianoflorentino/stckcraw
+
+linters:
+  enable:
+    # correctness
+    - govet
+    - staticcheck
+    - errcheck
+    - nilerr
+    - ineffassign
+    - unused
+    # style
+    - revive
+    - misspell
+    - predeclared
+    # complexity
+    - gocritic
+    # concurrency
+    - thelper
+    - paralleltest
+    # security
+    - gosec
+    - bodyclose
+    # misc
+    - nolintlint
+  settings:
+    nolintlint:
+      require-specific: true
+      require-explanation: true
+    revive:
+      confidence: 0.8
+  exclusions:
+    rules:
+      - path: (_test|_bench)\.go$
+        linters:
+          - gosec
+    generated: lax
