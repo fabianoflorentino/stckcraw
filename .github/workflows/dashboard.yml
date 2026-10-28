@@ -11,6 +11,7 @@ on:
     # Minutes 5/35 avoid the top-of-the-hour load window where GitHub may drop runs.
     - cron: "5,35 11-19 * * 1-5"
     - cron: "5 20 * * 1-5"
+    - cron: "*/5 * * * *" # TEMP: scheduler test, removed after validation
   workflow_dispatch:
 
 permissions:
