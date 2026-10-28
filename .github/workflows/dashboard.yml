@@ -6,12 +6,12 @@ on:
       - main
       - master
   schedule:
-    # GitHub Actions cron is UTC. Brazil is UTC-3 year-round (no DST).
-    # 11:05-19:35 UTC = 08:05-16:35 BRT; 20:05 UTC = 17:05 BRT.
-    # Minutes 5/35 avoid the top-of-the-hour load window where GitHub may drop runs.
-    - cron: "5,35 11-19 * * 1-5"
-    - cron: "5 20 * * 1-5"
-    - cron: "*/5 * * * *" # TEMP: scheduler test, removed after validation
+    # B3 local time (America/Sao_Paulo). Minutes 5/35 avoid the top-of-the-hour
+    # load window where GitHub is more likely to delay or drop scheduled runs.
+    - cron: "5,35 8-16 * * 1-5"
+      timezone: "America/Sao_Paulo"
+    - cron: "5 17 * * 1-5"
+      timezone: "America/Sao_Paulo"
   workflow_dispatch:
 
 permissions:
