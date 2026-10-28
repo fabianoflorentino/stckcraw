@@ -6,7 +6,11 @@ on:
       - main
       - master
   schedule:
-    - cron: "*/30 * * * *"
+    # GitHub Actions cron is UTC. Brazil is UTC-3 year-round (no DST).
+    # 11:05-19:35 UTC = 08:05-16:35 BRT; 20:05 UTC = 17:05 BRT.
+    # Minutes 5/35 avoid the top-of-the-hour load window where GitHub may drop runs.
+    - cron: "5,35 11-19 * * 1-5"
+    - cron: "5 20 * * 1-5"
   workflow_dispatch:
 
 permissions:
