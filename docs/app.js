@@ -284,10 +284,14 @@ function renderGroup(group, index) {
     section.classList.add("collapsed");
   }
 
-  const head = document.createElement("div");
+  const head = document.createElement("button");
+  head.type = "button";
   head.className = "group-head";
+  head.setAttribute("aria-controls", bodyId);
+  head.setAttribute("aria-expanded", String(!collapsed));
+  head.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${label} (${items.length} ativos)`);
   head.innerHTML = `
-    <h2>${escapeHTML(label)}</h2>
+    <span class="group-title">${escapeHTML(label)}</span>
     <span class="group-count">${items.length} ativos</span>
     <span class="scroll-hint">deslize a tabela →</span>`;
 
@@ -298,15 +302,11 @@ function renderGroup(group, index) {
     head.appendChild(leaderEl);
   }
 
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "group-toggle";
-  toggle.setAttribute("aria-controls", bodyId);
-  toggle.setAttribute("aria-expanded", String(!collapsed));
-  toggle.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${label}`);
-  toggle.title = toggle.getAttribute("aria-label");
-  toggle.innerHTML = '<span class="chevron" aria-hidden="true"></span>';
-  head.appendChild(toggle);
+  const chevron = document.createElement("span");
+  chevron.className = "group-toggle";
+  chevron.setAttribute("aria-hidden", "true");
+  chevron.innerHTML = '<span class="chevron"></span>';
+  head.appendChild(chevron);
 
   const body = document.createElement("div");
   body.className = "group-body";
@@ -317,11 +317,10 @@ function renderGroup(group, index) {
   inner.className = "group-body-inner";
   body.appendChild(inner);
 
-  toggle.addEventListener("click", () => {
+  head.addEventListener("click", () => {
     const isCollapsed = section.classList.toggle("collapsed");
-    toggle.setAttribute("aria-expanded", String(!isCollapsed));
-    toggle.setAttribute("aria-label", `${isCollapsed ? "Expandir" : "Recolher"} ${label}`);
-    toggle.title = toggle.getAttribute("aria-label");
+    head.setAttribute("aria-expanded", String(!isCollapsed));
+    head.setAttribute("aria-label", `${isCollapsed ? "Expandir" : "Recolher"} ${label} (${items.length} ativos)`);
     body.setAttribute("aria-hidden", String(isCollapsed));
     setCollapsed(group.key, isCollapsed);
   });
