@@ -1,0 +1,8 @@
+# Static site Worker for https://stckcraw.fabianoflorentino.workers.dev
+# This Worker only serves assets; the cron dispatcher is stckcraw-dispatch.
+name = "stckcraw"
+account_id = "00539ff152759d320729c77d2d5ad481"
+compatibility_date = "2026-10-29"
+
+[assets]
+directory = "../../docs"

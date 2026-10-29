@@ -124,6 +124,20 @@ flowchart LR
 
 O PAT fica como secret do Worker; não entra no repositório nem no `docs/app.js`. O Worker não gera dados: apenas inicia o workflow, que continua consultando a brapi e publicando o Pages.
 
+### Espelho estático no Cloudflare
+
+O `cloudflare/site/wrangler.toml` publica `docs/` no Worker `stckcraw` (assets-only). O cron continua separado no `stckcraw-dispatch`.
+
+```mermaid
+flowchart LR
+  actions["GitHub Actions"] -->|artifact docs/| pages["GitHub Pages"]
+  actions -->|wrangler deploy docs/| cf["Cloudflare static Worker"]
+  pages --> user["Navegador"]
+  cf --> user
+```
+
+O workflow só faz o deploy do espelho quando o secret `CLOUDFLARE_API_TOKEN` existe; sem ele, a etapa é ignorada e o Pages continua sendo a fonte principal.
+
 ## 7. Fallback no navegador
 
 ```mermaid

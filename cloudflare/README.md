@@ -13,7 +13,16 @@ flowchart LR
 
 O Worker **não gera dados**: ele apenas chama a API do GitHub para iniciar o workflow. O workflow continua sendo o responsável por consultar a brapi e publicar o Pages.
 
-> **Importante:** o site continua no GitHub Pages. Este Worker é só um script de cron/dispatch, chamado `stckcraw-dispatch`. Não suba a pasta `docs/` como Workers Static Assets nem use `wrangler pages deploy` para ele; Workers que só têm assets estáticos (como o `stckcraw` do site) não aceitam Cron Triggers.
+## Dois Workers, papéis diferentes
+
+| Worker | Papel | URL |
+|---|---|---|
+| `stckcraw-dispatch` | cron + `workflow_dispatch` | https://stckcraw-dispatch.fabianoflorentino.workers.dev |
+| `stckcraw` | espelho estático do `docs/` | https://stckcraw.fabianoflorentino.workers.dev |
+
+O Worker `stckcraw` é **assets-only**: ele serve o site, mas não aceita Cron Triggers. O cron fica no `stckcraw-dispatch`. O site principal continua no GitHub Pages; o `stckcraw` é um espelho opcional.
+
+> **Importante:** o site principal continua no GitHub Pages. O `stckcraw` é um espelho **assets-only** e não aceita Cron Triggers. O cron fica no script `stckcraw-dispatch`; não adicione `[assets]` ao `wrangler.toml` do dispatcher.
 
 **Worker deployado:** https://stckcraw-dispatch.fabianoflorentino.workers.dev
 
@@ -102,6 +111,19 @@ curl "http://localhost:8787/__scheduled?cron=5,35+11-19+*+*+1-5"
 - O endpoint `/trigger` exige `TRIGGER_SECRET`; sem o secret, ele responde `401`.
 - O botão **Atualizar** do site **não** chama esse endpoint: ele busca a brapi diretamente no navegador. O Worker existe para manter o snapshot estático atualizado.
 - O endpoint público expõe apenas `/health` e `/trigger`; qualquer outra rota responde `404`.
+
+## Espelho estático no Cloudflare
+
+O `cloudflare/site/wrangler.toml` publica a pasta `docs/` no Worker `stckcraw`:
+
+```bash
+cd cloudflare/site
+npx wrangler deploy
+```
+
+O workflow também faz esse deploy em cada execução, desde que o secret `CLOUDFLARE_API_TOKEN` exista no repositório. O token precisa de **Workers Scripts: Edit** para a conta `00539ff152759d320729c77d2d5ad481` (já no `wrangler.toml` do site). Se o secret não existir, a etapa é ignorada e o Pages continua funcionando.
+
+Se você não quiser manter o espelho, pode apagar o Worker `stckcraw` e usar apenas o GitHub Pages.
 
 ## Custo
 

@@ -18,7 +18,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Voltar ao topo:** botão flutuante com scroll suave.
 - **Atualização automática:** o site verifica o snapshot a cada 30 minutos; se ele estiver velho ou ausente, consulta a brapi diretamente no navegador.
 - **Docker:** sobe o dashboard local com atualização a cada 30 minutos.
-- **Cloudflare Worker opcional:** cron independente que dispara o workflow no GitHub.
+- **Cloudflare:** cron dispatcher (`stckcraw-dispatch`) e espelho estático opcional (`stckcraw`).
 - **Modo CSV legado:** ainda é possível baixar os CSVs do InfoMoney/XP com os filtros originais.
 - **Sem dependências Go externas:** o binário usa apenas a biblioteca padrão.
 
@@ -78,7 +78,7 @@ Resumo dos pacotes:
 │   ├── style.css
 │   ├── app.js
 │   └── architecture.md      # documentação de arquitetura
-├── cloudflare/              # Worker opcional de gatilho
+├── cloudflare/              # cron dispatcher + site estático opcional
 ├── docker/entrypoint.sh     # loop de atualização local
 ├── .github/workflows/       # agendamento e deploy
 ├── Dockerfile
@@ -178,6 +178,8 @@ O workflow `.github/workflows/dashboard.yml` roda:
 O cron é “best effort”: o GitHub pode atrasar ou descartar execuções em horários de pico. Por isso o frontend tem o fallback direto na brapi quando o snapshot está velho. O botão **Workflow** continua levando à página do Actions para disparo manual.
 
 Se quiser uma atualização automática do snapshot estático independente do scheduler do GitHub, existe o Worker opcional da Cloudflare em [cloudflare/README.md](cloudflare/README.md). Ele chama `workflow_dispatch` por cron e usa um PAT fine-grained guardado como secret.
+
+O Cloudflare também tem um espelho estático opcional em `cloudflare/site`, publicado em https://stckcraw.fabianoflorentino.workers.dev. O workflow atualiza esse espelho quando o secret `CLOUDFLARE_API_TOKEN` está configurado; sem o secret, a etapa é ignorada.
 
 ## Contrato JSON
 

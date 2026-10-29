@@ -57,3 +57,23 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Check Cloudflare token
+        id: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare static deploy skipped: CLOUDFLARE_API_TOKEN is not set"
+          fi
+
+      - name: Deploy static site to Cloudflare
+        if: steps.cloudflare.outputs.enabled == 'true'
+        continue-on-error: true
+        working-directory: cloudflare/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx -y wrangler@4.155.0 deploy
