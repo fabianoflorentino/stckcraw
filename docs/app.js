@@ -12,6 +12,7 @@ const LIVE_GROUPS = [
 ];
 const groupsEl = document.getElementById("groups");
 const highlightsEl = document.getElementById("highlights");
+const indicesEl = document.getElementById("indices");
 const statusEl = document.getElementById("status");
 const refreshEl = document.getElementById("refresh");
 const toastEl = document.getElementById("toast");
@@ -42,6 +43,11 @@ const money = new Intl.NumberFormat("pt-BR", {
 const compact = new Intl.NumberFormat("pt-BR", {
   notation: "compact",
   maximumFractionDigits: 1,
+});
+
+const points = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 const percent = new Intl.NumberFormat("pt-BR", {
@@ -105,6 +111,10 @@ function formatCompact(value) {
 
 function formatPercent(value) {
   return Number.isFinite(value) ? `${percent.format(value)}%` : "—";
+}
+
+function formatPoints(value) {
+  return Number.isFinite(value) ? points.format(value) : "—";
 }
 
 function formatDate(value) {
@@ -175,6 +185,62 @@ function highlightCard(label, value, meta, tone) {
     <strong class="highlight-value ${tone}">${escapeHTML(value)}</strong>
     <span class="highlight-meta">${escapeHTML(meta)}</span>`;
   return card;
+}
+
+function formatIndexTime(index) {
+  const date = new Date(index.asOf);
+  if (Number.isNaN(date.getTime())) {
+    return "último dado indisponível";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: index.timezone || "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date);
+  } catch {
+    return formatDate(index.asOf);
+  }
+}
+
+function renderIndexCard(index, position) {
+  const card = document.createElement("article");
+  card.className = "index-card";
+  card.style.setProperty("--i", String(position));
+  if (index.error) {
+    card.classList.add("error");
+  }
+
+  const tone = index.error ? "neutral" : changeTone(index.change);
+  const value = index.error ? "—" : formatPoints(index.price);
+  const change = index.error ? "indisponível" : formatPercent(index.change);
+  const meta = index.error || formatIndexTime(index);
+
+  card.innerHTML = `
+    <div class="index-head">
+      <span class="index-label">${escapeHTML(index.label || index.key)}</span>
+      <span class="index-symbol">${escapeHTML(index.symbol || "")}</span>
+    </div>
+    <strong class="index-value">${escapeHTML(value)}</strong>
+    <span class="index-change ${tone}">${escapeHTML(change)}</span>
+    <span class="index-meta" title="${escapeHTML(meta)}">${escapeHTML(meta)}</span>`;
+
+  return card;
+}
+
+function renderIndices(indices) {
+  if (!Array.isArray(indices) || indices.length === 0) {
+    indicesEl.replaceChildren();
+    indicesEl.hidden = true;
+    return;
+  }
+
+  indicesEl.hidden = false;
+  indicesEl.replaceChildren(...indices.map((index, position) => renderIndexCard(index, position)));
 }
 
 function renderHighlights(groups, mode) {
@@ -409,6 +475,7 @@ function setMode(mode) {
 
 function render(snapshot) {
   lastSnapshot = snapshot;
+  renderIndices(snapshot.indices || []);
   renderActiveGroups();
   updateStatus(snapshot);
 }
@@ -485,7 +552,7 @@ async function fetchGroupLive(group, sortOrder) {
   return items;
 }
 
-async function fetchLiveSnapshot() {
+async function fetchLiveSnapshot(previousIndices = []) {
   const groups = [];
   const lows = [];
   let failures = 0;
@@ -524,6 +591,7 @@ async function fetchLiveSnapshot() {
     limit: 10,
     groups,
     lows,
+    indices: previousIndices,
   };
 }
 
@@ -550,7 +618,8 @@ async function load({ manual = false, forceLive = false } = {}) {
     let live = false;
     if (!snapshot || forceLive || isSnapshotStale(snapshot)) {
       try {
-        snapshot = await fetchLiveSnapshot();
+        const previousIndices = snapshot?.indices || lastSnapshot?.indices || [];
+        snapshot = await fetchLiveSnapshot(previousIndices);
         live = true;
       } catch (error) {
         if (!snapshot) {

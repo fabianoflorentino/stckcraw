@@ -11,6 +11,7 @@ import (
 
 	"github.com/fabianoflorentino/stckcraw/internal/brapi"
 	"github.com/fabianoflorentino/stckcraw/internal/dashboard"
+	"github.com/fabianoflorentino/stckcraw/internal/marketindex"
 )
 
 type fakeFetcher struct {
@@ -122,6 +123,75 @@ func TestBuilderFetchesBothDirections(t *testing.T) {
 	}
 }
 
+type fakeIndexFetcher struct {
+	quotes []marketindex.Quote
+	err    error
+}
+
+func (f fakeIndexFetcher) FetchAll(_ context.Context, _ []marketindex.Definition) ([]marketindex.Quote, error) {
+	return f.quotes, f.err
+}
+
+func TestBuilderIncludesIndices(t *testing.T) {
+	t.Parallel()
+
+	fetcher := fakeFetcher{assets: map[string][]brapi.Asset{
+		"stock/stock": {{Symbol: "PETR4", Close: 38.5, Change: 1.2}},
+	}}
+	indices := fakeIndexFetcher{quotes: []marketindex.Quote{
+		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", Price: 169081.88, Change: -1.12},
+		{Key: "sp500", Label: "S&P 500", Symbol: "^GSPC", Price: 7706.81, Change: -0.48},
+	}}
+
+	builder, err := dashboard.NewBuilder(
+		fetcher,
+		dashboard.WithGroups([]brapi.Group{{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"}}),
+		dashboard.WithIndexFetcher(indices),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder() error = %v", err)
+	}
+
+	snapshot, err := builder.Build(context.Background())
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if len(snapshot.Indices) != 2 {
+		t.Fatalf("indices = %d, want 2", len(snapshot.Indices))
+	}
+	if snapshot.Indices[0].Key != "ibovespa" || snapshot.Indices[0].Price != 169081.88 {
+		t.Errorf("unexpected index: %+v", snapshot.Indices[0])
+	}
+}
+
+func TestBuilderIndexFailureIsNotFatal(t *testing.T) {
+	t.Parallel()
+
+	fetcher := fakeFetcher{assets: map[string][]brapi.Asset{
+		"stock/stock": {{Symbol: "PETR4", Close: 38.5, Change: 1.2}},
+	}}
+	indices := fakeIndexFetcher{quotes: []marketindex.Quote{
+		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", Error: "yahoo unavailable"},
+	}}
+
+	builder, err := dashboard.NewBuilder(
+		fetcher,
+		dashboard.WithGroups([]brapi.Group{{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"}}),
+		dashboard.WithIndexFetcher(indices),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder() error = %v", err)
+	}
+
+	snapshot, err := builder.Build(context.Background())
+	if err != nil {
+		t.Fatalf("Build() error = %v, want nil", err)
+	}
+	if len(snapshot.Indices) != 1 || snapshot.Indices[0].Error == "" {
+		t.Errorf("unexpected indices: %+v", snapshot.Indices)
+	}
+}
+
 func TestBuilderKeepsPartialResults(t *testing.T) {
 	t.Parallel()
 
@@ -212,6 +282,8 @@ func TestNewBuilderValidation(t *testing.T) {
 		{name: "zero limit", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithLimit(0)}},
 		{name: "empty groups", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithGroups(nil)}},
 		{name: "nil clock", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithClock(nil)}},
+		{name: "nil index fetcher", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithIndexFetcher(nil)}},
+		{name: "empty index definitions", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithIndexDefinitions(nil)}},
 	}
 
 	for _, test := range tests {

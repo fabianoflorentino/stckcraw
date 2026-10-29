@@ -317,6 +317,110 @@ h1 span {
   font-size: 0.82rem;
 }
 
+.indices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 14px;
+}
+
+.index-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(89, 168, 255, 0.08), transparent 58%),
+    var(--card);
+  animation: rise 0.5s ease both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.index-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.5;
+}
+
+.index-card:hover {
+  border-color: rgba(89, 168, 255, 0.38);
+  transform: translateY(-2px);
+}
+
+.index-card.error {
+  opacity: 0.8;
+}
+
+.index-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.index-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.index-symbol {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.index-value {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.index-change {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.index-change.positive {
+  color: var(--positive);
+}
+
+.index-change.negative {
+  color: var(--negative);
+}
+
+.index-change.neutral {
+  color: var(--neutral);
+}
+
+.index-meta {
+  display: block;
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .highlights {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -840,6 +944,10 @@ h1 span {
 }
 
 @media (max-width: 900px) {
+  .indices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero {
     align-items: flex-start;
     padding-top: 36px;
@@ -878,6 +986,15 @@ h1 span {
   .mode-button {
     flex: 1;
     padding: 9px 12px;
+  }
+
+  .indices {
+    grid-template-columns: 1fr;
+    padding: 0 16px 12px;
+  }
+
+  .index-value {
+    font-size: 1.35rem;
   }
 
   .highlights {

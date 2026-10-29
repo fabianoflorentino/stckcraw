@@ -18,6 +18,7 @@ import (
 	"github.com/fabianoflorentino/stckcraw/internal/dashboard"
 	"github.com/fabianoflorentino/stckcraw/internal/export"
 	"github.com/fabianoflorentino/stckcraw/internal/marketdata"
+	"github.com/fabianoflorentino/stckcraw/internal/marketindex"
 )
 
 // Process exit codes.
@@ -49,6 +50,8 @@ type options struct {
 	dashboard      bool
 	dashboardLimit int
 	brapiBaseURL   string
+	yahooBaseURL   string
+	noIndices      bool
 }
 
 type usageError struct {
@@ -112,6 +115,8 @@ func parse(args []string, stderr io.Writer) (options, error) {
 		dashboardMode  = flags.Bool("dashboard", false, "generate the dashboard JSON instead of CSV")
 		dashboardLimit = flags.Int("limit", 10, "items per dashboard group")
 		brapiBaseURL   = flags.String("brapi-base-url", brapi.DefaultBaseURL, "brapi.dev API base URL")
+		yahooBaseURL   = flags.String("yahoo-base-url", marketindex.DefaultBaseURL, "Yahoo Finance index API base URL")
+		noIndices      = flags.Bool("no-indices", false, "skip market index cards")
 	)
 
 	flags.Usage = func() {
@@ -159,6 +164,19 @@ func parse(args []string, stderr io.Writer) (options, error) {
 			return options{}, usageError{errors.New("brapi base URL must include a host")}
 		}
 
+		if !*noIndices {
+			parsed, err := url.Parse(*yahooBaseURL)
+			if err != nil {
+				return options{}, usageError{fmt.Errorf("parse Yahoo base URL: %w", err)}
+			}
+			if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				return options{}, usageError{fmt.Errorf("yahoo base URL scheme must be http or https, got %q", parsed.Scheme)}
+			}
+			if parsed.Host == "" {
+				return options{}, usageError{errors.New("yahoo base URL must include a host")}
+			}
+		}
+
 		return options{
 			outDir:         *outDir,
 			requestTimeout: *requestTimeout,
@@ -166,6 +184,8 @@ func parse(args []string, stderr io.Writer) (options, error) {
 			dashboard:      true,
 			dashboardLimit: *dashboardLimit,
 			brapiBaseURL:   *brapiBaseURL,
+			yahooBaseURL:   *yahooBaseURL,
+			noIndices:      *noIndices,
 		}, nil
 	}
 
@@ -301,7 +321,19 @@ func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) e
 		return fmt.Errorf("create brapi client: %w", err)
 	}
 
-	builder, err := dashboard.NewBuilder(client, dashboard.WithLimit(opts.dashboardLimit))
+	builderOpts := []dashboard.Option{dashboard.WithLimit(opts.dashboardLimit)}
+	if !opts.noIndices {
+		indexClient, indexErr := marketindex.NewClient(
+			marketindex.WithBaseURL(opts.yahooBaseURL),
+			marketindex.WithHTTPClient(&http.Client{Timeout: opts.requestTimeout}),
+		)
+		if indexErr != nil {
+			return fmt.Errorf("create market index client: %w", indexErr)
+		}
+		builderOpts = append(builderOpts, dashboard.WithIndexFetcher(indexClient))
+	}
+
+	builder, err := dashboard.NewBuilder(client, builderOpts...)
 	if err != nil {
 		return fmt.Errorf("create dashboard builder: %w", err)
 	}
@@ -336,8 +368,17 @@ func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) e
 		}
 	}
 
-	writeFormat(stdout, "wrote %s (%d altas, %d baixas, %d failed, %s)\n",
-		path, len(snapshot.Groups), len(snapshot.Lows), failed, snapshot.GeneratedAt.Format(time.RFC3339))
+	var indexFailures int
+	for _, index := range snapshot.Indices {
+		if index.Error != "" {
+			indexFailures++
+			writeFormat(stderr, "warn índice %-8s %s\n", index.Key, index.Error)
+		}
+	}
+
+	writeFormat(stdout, "wrote %s (%d altas, %d baixas, %d índices, %d grupos com erro, %d índices com erro, %s)\n",
+		path, len(snapshot.Groups), len(snapshot.Lows), len(snapshot.Indices), failed, indexFailures,
+		snapshot.GeneratedAt.Format(time.RFC3339))
 
 	return nil
 }

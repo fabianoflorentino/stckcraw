@@ -12,6 +12,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 ## O que tem
 
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
+- **Índices de mercado:** Ibovespa, S&P 500, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
 - **Voltar ao topo:** botão flutuante com scroll suave.
@@ -29,6 +30,7 @@ flowchart LR
   runner --> test["go test ./..."]
   runner --> crawler["stckcraw -dashboard"]
   crawler -->|12 requisições| brapi["brapi.dev"]
+  crawler -->|4 requisições| yahoo["Yahoo Finance"]
   crawler --> json["docs/data/latest.json"]
   json --> artifact["Artifact docs/"]
   artifact --> pages["GitHub Pages"]
@@ -37,9 +39,9 @@ flowchart LR
   user -.->|snapshot velho| brapi
 ```
 
-O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta as duas abas do dashboard.
+O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
 
-O frontend usa o snapshot como cache: se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. O botão **Atualizar** força essa consulta direta.
+O frontend usa o snapshot como cache: se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
 
 ## Arquitetura
 
@@ -52,6 +54,7 @@ Resumo dos pacotes:
 | `cmd/stckcraw` | entrada do binário e cancelamento por sinal |
 | `internal/cli` | flags, exit codes, modos CSV/dashboard |
 | `internal/brapi` | client HTTP do brapi.dev e catálogo de grupos |
+| `internal/marketindex` | client Yahoo Finance dos índices de mercado |
 | `internal/dashboard` | monta o snapshot normalizado e grava o JSON |
 | `internal/marketdata` | fonte InfoMoney/XP e variantes de filtro |
 | `internal/crawler` | orquestração concorrente das variantes CSV |
@@ -64,6 +67,7 @@ Resumo dos pacotes:
 ├── cmd/stckcraw/            # binário
 ├── internal/
 │   ├── brapi/               # client brapi.dev
+│   ├── marketindex/         # client Yahoo Finance dos índices
 │   ├── cli/                 # CLI
 │   ├── crawler/             # orquestrador CSV
 │   ├── dashboard/           # snapshot JSON do dashboard
@@ -184,6 +188,18 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
   "generatedAt": "2026-10-28T21:41:09Z",
   "source": "brapi.dev",
   "limit": 10,
+  "indices": [
+    {
+      "key": "ibovespa",
+      "label": "Ibovespa",
+      "symbol": "^BVSP",
+      "price": 169081.88,
+      "change": -1.12,
+      "currency": "BRL",
+      "timezone": "America/Sao_Paulo",
+      "asOf": "2026-10-29T17:22:00Z"
+    }
+  ],
   "groups": [
     {
       "key": "acoes",
@@ -221,16 +237,18 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 
 | Item | Situação |
 |---|---|
-| Fonte | brapi.dev, sem autenticação |
+| Fonte | brapi.dev (B3) + Yahoo Finance (índices), sem autenticação |
 | Cobertura | B3: Ações, FIIs, FIPs, ETFs, BDRs e Units |
+| Índices | Ibovespa (`^BVSP`), S&P 500 (`^GSPC`), Euro Stoxx 50 (`^STOXX50E`) e Shanghai (`000001.SS`) |
+| Horário dos índices | cada card mostra a última cotação no fuso da bolsa |
 | Ordenação | variação percentual do dia |
 | Volume | aproximado (`preço × quantidade`) |
-| Índices | não implementados (IBOV, IDIV etc.) |
 | Nasdaq/NYSE | não implementados |
 | Tickers fracionários | descartados |
 | Feriados B3 | o workflow roda mesmo assim e repete o último snapshot |
 | Rate limit brapi | 20 req/min; usamos 12 por execução |
 | Fallback do navegador | consulta a brapi quando o snapshot tem mais de 35 min |
+| Fallback de índices | a Yahoo não expõe CORS; o navegador mantém os índices do último snapshot |
 
 ## Qualidade
 

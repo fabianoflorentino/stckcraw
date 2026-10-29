@@ -145,12 +145,27 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	}))
 	defer server.Close()
 
+	indexServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "/v8/finance/chart/") {
+			t.Errorf("index path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprint(w, `{"chart":{"result":[{"meta":{
+			"symbol":"^BVSP","regularMarketPrice":169081.88,"chartPreviousClose":171006.1,
+			"regularMarketTime":1793294520,"currency":"BRL","exchangeTimezoneName":"America/Sao_Paulo"
+		}}],"error":null}}`); err != nil {
+			t.Errorf("write index response: %v", err)
+		}
+	}))
+	defer indexServer.Close()
+
 	outDir := t.TempDir()
 	var stdout, stderr bytes.Buffer
 
 	code := cli.Run(context.Background(), []string{
 		"-dashboard",
 		"-brapi-base-url", server.URL,
+		"-yahoo-base-url", indexServer.URL,
 		"-out", outDir,
 		"-limit", "2",
 	}, &stdout, &stderr)
@@ -181,6 +196,12 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	}
 	if len(snapshot.Lows[0].Items) != 1 || snapshot.Lows[0].Items[0].Symbol != "PETR4" {
 		t.Errorf("unexpected first low group: %+v", snapshot.Lows[0])
+	}
+	if len(snapshot.Indices) != 4 {
+		t.Fatalf("indices = %d, want 4", len(snapshot.Indices))
+	}
+	if snapshot.Indices[0].Price != 169081.88 || snapshot.Indices[0].Key != "ibovespa" {
+		t.Errorf("unexpected first index: %+v", snapshot.Indices[0])
 	}
 	if got := requests.Load(); got != 12 {
 		t.Errorf("requests = %d, want 12", got)

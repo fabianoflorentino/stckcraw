@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fabianoflorentino/stckcraw/internal/brapi"
+	"github.com/fabianoflorentino/stckcraw/internal/marketindex"
 )
 
 const (
@@ -21,6 +22,11 @@ const (
 // TopFetcher fetches ranked assets for one brapi query.
 type TopFetcher interface {
 	Top(ctx context.Context, req brapi.ListRequest) ([]brapi.Asset, error)
+}
+
+// IndexFetcher fetches the major market indices shown above the B3 tables.
+type IndexFetcher interface {
+	FetchAll(ctx context.Context, definitions []marketindex.Definition) ([]marketindex.Quote, error)
 }
 
 // Item is one row in a dashboard group.
@@ -45,19 +51,22 @@ type Group struct {
 
 // Snapshot is the JSON document published to GitHub Pages.
 type Snapshot struct {
-	GeneratedAt time.Time `json:"generatedAt"`
-	Source      string    `json:"source"`
-	Limit       int       `json:"limit"`
-	Groups      []Group   `json:"groups"`
-	Lows        []Group   `json:"lows"`
+	GeneratedAt time.Time           `json:"generatedAt"`
+	Source      string              `json:"source"`
+	Limit       int                 `json:"limit"`
+	Groups      []Group             `json:"groups"`
+	Lows        []Group             `json:"lows"`
+	Indices     []marketindex.Quote `json:"indices"`
 }
 
 // Builder assembles a Snapshot from a TopFetcher.
 type Builder struct {
-	fetcher TopFetcher
-	groups  []brapi.Group
-	limit   int
-	now     func() time.Time
+	fetcher      TopFetcher
+	indexFetcher IndexFetcher
+	groups       []brapi.Group
+	indices      []marketindex.Definition
+	limit        int
+	now          func() time.Time
 }
 
 // Option configures a Builder.
@@ -70,6 +79,28 @@ func WithLimit(limit int) Option {
 			return fmt.Errorf("limit must be positive, got %d", limit)
 		}
 		b.limit = limit
+		return nil
+	}
+}
+
+// WithIndexFetcher sets the optional market index source.
+func WithIndexFetcher(fetcher IndexFetcher) Option {
+	return func(b *Builder) error {
+		if fetcher == nil {
+			return errors.New("index fetcher must not be nil")
+		}
+		b.indexFetcher = fetcher
+		return nil
+	}
+}
+
+// WithIndexDefinitions overrides the indices shown on the dashboard.
+func WithIndexDefinitions(definitions []marketindex.Definition) Option {
+	return func(b *Builder) error {
+		if len(definitions) == 0 {
+			return errors.New("at least one index definition is required")
+		}
+		b.indices = append([]marketindex.Definition(nil), definitions...)
 		return nil
 	}
 }
@@ -105,6 +136,7 @@ func NewBuilder(fetcher TopFetcher, opts ...Option) (*Builder, error) {
 	builder := &Builder{
 		fetcher: fetcher,
 		groups:  brapi.Groups(),
+		indices: marketindex.DefaultIndices(),
 		limit:   defaultLimit,
 		now:     time.Now,
 	}
@@ -129,6 +161,7 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 		Limit:       b.limit,
 		Groups:      make([]Group, 0, len(b.groups)),
 		Lows:        make([]Group, 0, len(b.groups)),
+		Indices:     make([]marketindex.Quote, 0, len(b.indices)),
 	}
 
 	var (
@@ -177,6 +210,14 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 
 	if successes == 0 {
 		return snapshot, fmt.Errorf("all dashboard groups failed: %w", errors.Join(failures...))
+	}
+
+	if b.indexFetcher != nil {
+		indices, err := b.indexFetcher.FetchAll(ctx, b.indices)
+		if err != nil {
+			return snapshot, fmt.Errorf("fetch market indices: %w", err)
+		}
+		snapshot.Indices = indices
 	}
 
 	return snapshot, nil

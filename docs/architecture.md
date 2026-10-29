@@ -21,10 +21,12 @@ flowchart LR
   pages --> data["docs/data/latest.json"]
   actions["GitHub Actions"] --> crawler["stckcraw -dashboard"]
   crawler -->|12 requisições| brapi["brapi.dev"]
+  crawler -->|4 requisições| yahoo["Yahoo Finance"]
   crawler --> data
   actions -->|artifact docs/| pages
   local["Docker Compose"] --> localCrawler["dashboard container"]
   localCrawler -->|12 requisições| brapi
+  localCrawler -->|4 requisições| yahoo
   localCrawler --> volume[("dashboard-data")]
   localWeb["web container"] --> volume
   localWeb --> browser["Navegador local"]
@@ -37,6 +39,7 @@ flowchart LR
 | `cmd/stckcraw` | entrypoint | cria o contexto com `signal.NotifyContext` e chama a CLI |
 | `internal/cli` | interface | flags, validação, exit codes e seleção de modo |
 | `internal/brapi` | adapter | client do `/quote/list`, grupos e `sortOrder` |
+| `internal/marketindex` | adapter | client Yahoo Finance dos índices |
 | `internal/dashboard` | use case | consulta altas/baixas, normaliza itens e grava o snapshot |
 | `internal/marketdata` | adapter legado | descoberta da config, client XP e variantes de filtro |
 | `internal/crawler` | use case legado | orquestra as variantes CSV com concorrência limitada |
@@ -49,11 +52,13 @@ flowchart LR
   cmd["cmd/stckcraw"] --> cli["internal/cli"]
   cli --> dashboard["internal/dashboard"]
   cli --> brapi["internal/brapi"]
+  cli --> marketindex["internal/marketindex"]
   cli --> crawler["internal/crawler"]
   cli --> export["internal/export"]
   cli --> marketdata["internal/marketdata"]
   crawler --> marketdata
   dashboard --> brapi
+  dashboard --> marketindex
 ```
 
 As dependências apontam para dentro: CLI conhece os casos de uso, os casos de uso conhecem interfaces/adapters, e o domínio (`Quote`, `Item`, `Group`) não importa HTTP.
@@ -69,9 +74,12 @@ flowchart TD
   xp --> variants["30 variantes B3 + Nasdaq + NYSE"]
   variants --> files["CSV por variante"]
   mode -->|sim| brapi["brapi.dev"]
+  mode -->|sim| yahoo["Yahoo Finance"]
   brapi --> groups["6 grupos x altas/baixas"]
+  yahoo --> indices["4 índices de mercado"]
   groups --> normalize["Filtra fracionários e normaliza"]
-  normalize --> json["docs/data/latest.json"]
+  indices --> json["docs/data/latest.json"]
+  normalize --> json
 ```
 
 ## 6. Fluxo agendado
@@ -83,6 +91,7 @@ sequenceDiagram
   participant R as Runner
   participant C as stckcraw
   participant B as brapi.dev
+  participant Y as Yahoo Finance
   participant P as GitHub Pages
 
   S->>R: cron seg-sex 08:05-17:05 BRT
@@ -92,6 +101,8 @@ sequenceDiagram
     C->>B: GET /quote/list?type=...&sortOrder=...
     B-->>C: JSON com top N
   end
+  C->>Y: GET /v8/finance/chart (4 índices)
+  Y-->>C: Ibovespa, S&P 500, Euro Stoxx 50, Shanghai
   C->>C: filtra fracionários e calcula volume
   C-->>R: docs/data/latest.json
   R->>P: upload artifact + deploy
@@ -129,8 +140,9 @@ sequenceDiagram
     U->>B: GET /quote/list (6 tipos x 2 direções)
     B-->>U: JSON de altas e baixas
     U->>U: filtra fracionários e monta o contrato
+    Note over U: índices continuam vindo do último snapshot
   end
-  U->>U: renderiza abas Altas e Baixas
+  U->>U: renderiza cards de índices e abas Altas/Baixas
 ```
 
 O fallback depende de CORS. A brapi responde `access-control-allow-origin: *`, então o navegador pode chamar o endpoint diretamente.
@@ -164,6 +176,18 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
   "generatedAt": "2026-10-28T21:41:09Z",
   "source": "brapi.dev",
   "limit": 10,
+  "indices": [
+    {
+      "key": "ibovespa",
+      "label": "Ibovespa",
+      "symbol": "^BVSP",
+      "price": 169081.88,
+      "change": -1.12,
+      "currency": "BRL",
+      "timezone": "America/Sao_Paulo",
+      "asOf": "2026-10-29T17:22:00Z"
+    }
+  ],
   "groups": [
     {
       "key": "acoes",
@@ -197,6 +221,10 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
 | `sector` | `sector` | pode ser nulo |
 | `rank` | calculado | 1..limit após filtro de fracionários |
 | `error` | calculado | presente apenas quando o grupo falha |
+| `indices[].price` | `regularMarketPrice` | último valor do índice |
+| `indices[].change` | `price / chartPreviousClose` | variação percentual |
+| `indices[].asOf` | `regularMarketTime` | horário UTC da última cotação |
+| `indices[].timezone` | `exchangeTimezoneName` | fuso usado no card |
 
 ## 10. Falhas e resiliência
 
@@ -220,8 +248,13 @@ flowchart TD
 | volume Docker sem permissão | `docker compose down -v` recria o volume |
 | cron atrasado/descartado | `push` ou `workflow_dispatch` atualizam manualmente |
 | snapshot velho/ausente | navegador consulta a brapi diretamente |
+| Yahoo falha em um índice | card com `error`; demais índices e a B3 são publicados |
 
 ## 11. Decisões
+
+### Por que Yahoo para os índices?
+
+A API de chart da Yahoo entrega os quatro índices com uma única chamada por símbolo, sem autenticação, e inclui o horário e o fuso da última cotação. A desvantagem é que ela não envia CORS: o fallback do navegador não consegue atualizá-la, então os cards de índice usam o último snapshot gerado pelo Go. Como o Worker da Cloudflare mantém o snapshot fresco a cada 30 min, isso é suficiente para o painel.
 
 ### Por que brapi no dashboard?
 
@@ -249,6 +282,8 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - Apenas B3; índices (IBOV, IDIV etc.) e Nasdaq/NYSE não entram no dashboard.
 - A variação é a do dia; não há variação de 30 minutos.
 - O volume é aproximado.
+- Os índices vêm da Yahoo Finance (não oficial) e usam o último valor disponível de cada bolsa; sessões e feriados são diferentes entre B3, EUA, Europa e China.
+- O navegador não atualiza os índices no fallback porque a Yahoo não libera CORS.
 - Feriados da B3 não são tratados: o workflow roda e repete o último snapshot.
 - O scheduler do GitHub é best effort; um gatilho externo via `workflow_dispatch` é o fallback.
 
