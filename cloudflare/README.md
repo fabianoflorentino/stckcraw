@@ -114,7 +114,7 @@ curl "http://localhost:8787/__scheduled?cron=5,35+11-19+*+*+1-5"
 
 ## Espelho estático no Cloudflare
 
-O `cloudflare/site/wrangler.toml` publica a pasta `docs/` no Worker `stckcraw`:
+O `cloudflare/site/wrangler.toml` publica a pasta `docs/` no Worker `stckcraw`. O `docs/data/latest.json` é gerado e não fica no git; antes de um deploy manual, rode `make dashboard` para criá-lo (no CI ele já é gerado antes do deploy).
 
 ```bash
 cd cloudflare/site
