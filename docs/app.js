@@ -489,35 +489,52 @@ function isSnapshotStale(snapshot) {
   return Date.now() - generated > SNAPSHOT_MAX_AGE_MS;
 }
 
-async function fetchSnapshot() {
-  let primaryError = null;
-
-  try {
-    const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  } catch (error) {
-    primaryError = error;
+async function fetchSnapshotURL(url) {
+  const response = await fetch(`${url}?t=${Date.now()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
   }
-
-  try {
-    const response = await fetch(`${SNAPSHOT_FALLBACK_URL}?t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  } catch {
-    throw primaryError;
-  }
+  return response.json();
 }
+
+async function fetchSnapshot() {
+  let local = null;
+
+  try {
+    local = await fetchSnapshotURL(DATA_URL);
+  } catch {
+    local = null;
+  }
+
+  if (local && !isSnapshotStale(local)) {
+    return local;
+  }
+
+  try {
+    const proxied = await fetchSnapshotURL(SNAPSHOT_FALLBACK_URL);
+    if (!local) {
+      return proxied;
+    }
+
+    const localTime = new Date(local.generatedAt).getTime();
+    const proxiedTime = new Date(proxied.generatedAt).getTime();
+    if (Number.isFinite(proxiedTime) && (!Number.isFinite(localTime) || proxiedTime > localTime)) {
+      return proxied;
+    }
+  } catch {
+    // keep the local snapshot; the caller falls back to live brapi if needed
+  }
+
+  if (local) {
+    return local;
+  }
+
+  throw new Error("snapshot unavailable");
+}
+
 
 async function fetchGroupLive(group, sortOrder) {
   const params = new URLSearchParams({
