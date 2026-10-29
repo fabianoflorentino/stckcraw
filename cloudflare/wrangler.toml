@@ -17,3 +17,9 @@ crons = [
   "5,35 11-19 * * 1-5",
   "5 20 * * 1-5",
 ]
+
+[observability]
+enabled = true
+
+[observability.traces]
+enabled = true

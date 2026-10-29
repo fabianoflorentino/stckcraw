@@ -52,3 +52,6 @@ go.work.sum
 /cloudflare/.wrangler/
 /cloudflare/.dev.vars
 /cloudflare/node_modules/
+
+# Skills CLI universal install (duplicate)
+/agent/

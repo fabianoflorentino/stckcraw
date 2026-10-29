@@ -13,7 +13,9 @@ flowchart LR
 
 O Worker **não gera dados**: ele apenas chama a API do GitHub para iniciar o workflow. O workflow continua sendo o responsável por consultar a brapi e publicar o Pages.
 
-> **Importante:** o site continua no GitHub Pages. Este Worker é só um script de cron/dispatch. Não suba a pasta `docs/` como Workers Static Assets nem use `wrangler pages deploy` para ele; Workers que só têm assets estáticos não aceitam Cron Triggers.
+> **Importante:** o site continua no GitHub Pages. Este Worker é só um script de cron/dispatch, chamado `stckcraw-dispatch`. Não suba a pasta `docs/` como Workers Static Assets nem use `wrangler pages deploy` para ele; Workers que só têm assets estáticos (como o `stckcraw` do site) não aceitam Cron Triggers.
+
+**Worker deployado:** https://stckcraw-dispatch.fabianoflorentino.workers.dev
 
 ## Por que existe
 
@@ -41,6 +43,7 @@ Não use um token clássico com `repo` inteiro; o fine-grained reduz o escopo.
 
 ```bash
 cd cloudflare
+npm install
 npx wrangler login
 ```
 
@@ -55,6 +58,8 @@ npx wrangler secret put TRIGGER_SECRET
 ```
 
 `GITHUB_TOKEN` e `TRIGGER_SECRET` nunca ficam no repositório. O `wrangler.toml` contém apenas variáveis públicas (`GITHUB_OWNER`, `GITHUB_REPO`, etc.).
+
+> Sem `GITHUB_TOKEN`, o cron dispara mas falha com `missing GITHUB_OWNER, GITHUB_REPO, GITHUB_WORKFLOW or GITHUB_TOKEN`. Confira com `npx wrangler secret list`.
 
 ## 4. Deploy
 
@@ -111,6 +116,6 @@ O plano free da Cloudflare é suficiente: cerca de 19 execuções por dia útil,
 | `GitHub dispatch failed: 404` | `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_WORKFLOW` ou `GITHUB_REF` errados |
 | Cron não roda | `wrangler tail`, status do Worker no dashboard e os horários em UTC |
 | Workflow não publica | veja o run no Actions; o Worker só dispara o workflow |
-| `Triggers cannot be added to a Worker that only has static assets` | o Worker foi criado/deployado como static assets ou Pages. Ele precisa ser um script Worker: `main = "src/index.js"` no `wrangler.toml`, sem `[assets]`. Rode `npx wrangler deploy` dentro de `cloudflare/`; se o nome já existir como assets-only, apague esse Worker ou troque o `name` no `wrangler.toml` |
+| `Triggers cannot be added to a Worker that only has static assets` | o Worker foi criado/deployado como static assets ou Pages. O cron precisa ser um script Worker: `main = "src/index.js"` no `wrangler.toml`, sem `[assets]`. Rode `npx wrangler deploy` dentro de `cloudflare/`; o Worker de cron é `stckcraw-dispatch`, não o `stckcraw` de assets. Se o nome já existir como assets-only, apague esse Worker ou troque o `name` no `wrangler.toml` |
 
 Se o Worker falhar, o site continua funcionando pelo fallback no navegador.

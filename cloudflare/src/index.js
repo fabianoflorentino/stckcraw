@@ -2,7 +2,7 @@ const GITHUB_API = "https://api.github.com";
 
 export default {
   async scheduled(controller, env, _ctx) {
-    console.log(`cron ${controller.cron}`);
+    console.log(JSON.stringify({ event: "cron", cron: controller.cron }));
     await dispatch(env);
   },
 
@@ -18,7 +18,9 @@ export default {
     }
 
     const authorization = request.headers.get("Authorization") || "";
-    if (!env.TRIGGER_SECRET || authorization !== `Bearer ${env.TRIGGER_SECRET}`) {
+    const expected = `Bearer ${env.TRIGGER_SECRET || ""}`;
+
+    if (!env.TRIGGER_SECRET || !(await secureEqual(authorization, expected))) {
       return new Response("unauthorized", { status: 401 });
     }
 
@@ -26,8 +28,9 @@ export default {
       await dispatch(env);
       return Response.json({ ok: true });
     } catch (error) {
-      console.error(error);
-      return Response.json({ ok: false, error: error.message }, { status: 502 });
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({ event: "trigger_error", error: message }));
+      return Response.json({ ok: false, error: message }, { status: 502 });
     }
   },
 };
@@ -39,6 +42,7 @@ async function dispatch(env) {
     throw new Error("missing GITHUB_OWNER, GITHUB_REPO, GITHUB_WORKFLOW or GITHUB_TOKEN");
   }
 
+  const ref = GITHUB_REF || "main";
   const url = `${GITHUB_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`;
 
   const response = await fetch(url, {
@@ -49,13 +53,39 @@ async function dispatch(env) {
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "stckcraw-cloudflare-dispatch",
     },
-    body: JSON.stringify({ ref: GITHUB_REF || "main" }),
+    body: JSON.stringify({ ref }),
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`GitHub dispatch failed: ${response.status} ${body}`);
+    console.error(JSON.stringify({
+      event: "dispatch_error",
+      status: response.status,
+      body: body.slice(0, 500),
+    }));
+    throw new Error(`GitHub dispatch failed: ${response.status}`);
   }
 
-  console.log(`dispatched ${GITHUB_WORKFLOW} on ${GITHUB_REF || "main"}`);
+  console.log(JSON.stringify({ event: "dispatch", workflow: GITHUB_WORKFLOW, ref }));
+}
+
+async function secureEqual(provided, expected) {
+  const encoder = new TextEncoder();
+  const [providedHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(provided)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+  ]);
+
+  if (typeof crypto.subtle.timingSafeEqual === "function") {
+    return crypto.subtle.timingSafeEqual(providedHash, expectedHash);
+  }
+
+  // Fallback for local runtimes without the Workers extension.
+  const left = new Uint8Array(providedHash);
+  const right = new Uint8Array(expectedHash);
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left[index] ^ right[index];
+  }
+  return diff === 0;
 }
