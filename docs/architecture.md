@@ -9,6 +9,8 @@ O projeto tem dois modos no mesmo binário:
 1. **Dashboard** (`-dashboard`): consulta a brapi.dev e gera um JSON normalizado consumido pelo GitHub Pages.
 2. **CSV legado**: baixa os leaderboards do InfoMoney/XP por variante de filtro e grava um CSV por arquivo.
 
+No navegador, o frontend usa o `latest.json` como cache. Se o snapshot estiver ausente ou tiver mais de 35 minutos, ele consulta a brapi diretamente e monta o mesmo contrato. Isso mantém o site atualizado mesmo quando o scheduler do GitHub falha.
+
 O modo dashboard é o usado no deploy automático. O modo CSV continua disponível para exploração e comparação.
 
 ## 2. Contexto
@@ -98,7 +100,29 @@ sequenceDiagram
 
 O workflow também dispara em `push` para `main`/`master` e em `workflow_dispatch` manual. O cron usa `timezone: America/Sao_Paulo` e minutos `:05`/`:35` para reduzir a chance de o GitHub descartar a execução no topo da hora.
 
-## 7. Deploy local com Docker
+## 7. Fallback no navegador
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as Navegador
+  participant P as GitHub Pages
+  participant B as brapi.dev
+
+  U->>P: GET index.html + data/latest.json
+  alt snapshot com menos de 35 min
+    P-->>U: latest.json
+  else snapshot velho ou ausente
+    U->>B: GET /quote/list (6 tipos x 2 direções)
+    B-->>U: JSON de altas e baixas
+    U->>U: filtra fracionários e monta o contrato
+  end
+  U->>U: renderiza abas Altas e Baixas
+```
+
+O fallback depende de CORS. A brapi responde `access-control-allow-origin: *`, então o navegador pode chamar o endpoint diretamente.
+
+## 8. Deploy local com Docker
 
 ```mermaid
 flowchart LR
@@ -118,9 +142,9 @@ flowchart LR
 - O container `web` monta `docs/` e o volume `dashboard-data` em `/usr/share/nginx/html/data`.
 - Se uma atualização falhar, o snapshot anterior permanece no volume.
 
-## 8. Contrato JSON
+## 9. Contrato JSON
 
-O frontend não conhece brapi nem XP; ele consome apenas este contrato:
+O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fallback no navegador:
 
 ```json
 {
@@ -161,7 +185,7 @@ O frontend não conhece brapi nem XP; ele consome apenas este contrato:
 | `rank` | calculado | 1..limit após filtro de fracionários |
 | `error` | calculado | presente apenas quando o grupo falha |
 
-## 9. Falhas e resiliência
+## 10. Falhas e resiliência
 
 ```mermaid
 flowchart TD
@@ -182,8 +206,9 @@ flowchart TD
 | deploy do Pages falha | versão anterior permanece publicada |
 | volume Docker sem permissão | `docker compose down -v` recria o volume |
 | cron atrasado/descartado | `push` ou `workflow_dispatch` atualizam manualmente |
+| snapshot velho/ausente | navegador consulta a brapi diretamente |
 
-## 10. Decisões
+## 11. Decisões
 
 ### Por que brapi no dashboard?
 
@@ -203,8 +228,9 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - **Filtro de fracionários:** tickers terminados em `F` não entram no top 10.
 - **Persistência de UI:** o estado dos cards colapsados fica no `localStorage`.
 - **Cron com timezone explícito:** `America/Sao_Paulo` evita conversão manual de horário de verão e deixa a intenção legível.
+- **Fallback no navegador:** o site não depende exclusivamente do scheduler do GitHub; se o snapshot envelhecer, a própria página busca a brapi.
 
-## 11. Limitações e próximos passos
+## 12. Limitações e próximos passos
 
 - Apenas B3; índices (IBOV, IDIV etc.) e Nasdaq/NYSE não entram no dashboard.
 - A variação é a do dia; não há variação de 30 minutos.

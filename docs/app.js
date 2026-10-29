@@ -1,5 +1,15 @@
 const DATA_URL = "data/latest.json";
-const REFRESH_MS = 5 * 60 * 1000;
+const REFRESH_MS = 30 * 60 * 1000;
+const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
+
+const LIVE_GROUPS = [
+  { key: "acoes", label: "Ações", type: "stock", subType: "stock" },
+  { key: "fii", label: "FIIs", type: "fund", subType: "fii" },
+  { key: "fip", label: "FIPs", type: "fund", subType: "fip" },
+  { key: "etf", label: "ETFs", type: "fund", subType: "etf" },
+  { key: "bdr", label: "BDRs", type: "bdr" },
+  { key: "unit", label: "Units", type: "stock", subType: "unit" },
+];
 const groupsEl = document.getElementById("groups");
 const highlightsEl = document.getElementById("highlights");
 const statusEl = document.getElementById("status");
@@ -403,28 +413,160 @@ function render(snapshot) {
   updateStatus(snapshot);
 }
 
-async function load({ manual = false } = {}) {
+function isSnapshotStale(snapshot) {
+  const generated = new Date(snapshot?.generatedAt).getTime();
+  if (!Number.isFinite(generated)) {
+    return true;
+  }
+  return Date.now() - generated > SNAPSHOT_MAX_AGE_MS;
+}
+
+async function fetchSnapshot() {
+  const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function fetchGroupLive(group, sortOrder) {
+  const params = new URLSearchParams({
+    sortBy: "change",
+    sortOrder,
+    limit: "50",
+    type: group.type,
+  });
+  if (group.subType) {
+    params.set("subType", group.subType);
+  }
+
+  const response = await fetch(`https://brapi.dev/api/quote/list?${params}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (!Array.isArray(payload.stocks)) {
+    throw new Error("resposta inesperada da brapi");
+  }
+
+  const items = [];
+  for (const asset of payload.stocks) {
+    const symbol = String(asset.stock || "");
+    if (symbol.toUpperCase().endsWith("F")) {
+      continue;
+    }
+
+    const price = Number(asset.close) || 0;
+    const quantity = Number(asset.volume) || 0;
+
+    items.push({
+      rank: items.length + 1,
+      symbol,
+      name: asset.name || "",
+      price,
+      change: Number(asset.change) || 0,
+      financialVolume: Math.round(price * quantity * 100) / 100,
+      marketCap: asset.market_cap ?? undefined,
+      sector: asset.sector || "",
+    });
+
+    if (items.length === 10) {
+      break;
+    }
+  }
+
+  return items;
+}
+
+async function fetchLiveSnapshot() {
+  const groups = [];
+  const lows = [];
+  let failures = 0;
+
+  for (const group of LIVE_GROUPS) {
+    let highItems = [];
+    let lowItems = [];
+    let highError = "";
+    let lowError = "";
+
+    try {
+      highItems = await fetchGroupLive(group, "desc");
+    } catch (error) {
+      highError = error.message;
+      failures += 1;
+    }
+
+    try {
+      lowItems = await fetchGroupLive(group, "asc");
+    } catch (error) {
+      lowError = error.message;
+      failures += 1;
+    }
+
+    groups.push({ key: group.key, label: group.label, items: highItems, error: highError || undefined });
+    lows.push({ key: group.key, label: group.label, items: lowItems, error: lowError || undefined });
+  }
+
+  if (failures === LIVE_GROUPS.length * 2) {
+    throw new Error("brapi indisponível no momento");
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: "brapi.dev (browser)",
+    limit: 10,
+    groups,
+    lows,
+  };
+}
+
+async function load({ manual = false, forceLive = false } = {}) {
   if (loading) {
     return;
   }
 
   setLoading(true);
-  statusEl.textContent = manual ? "Buscando atualização…" : "Carregando…";
+  statusEl.textContent = manual || forceLive ? "Buscando atualização…" : "Carregando…";
   statusEl.classList.remove("error");
 
   try {
-    const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    let snapshot = null;
+
+    if (!forceLive) {
+      try {
+        snapshot = await fetchSnapshot();
+      } catch {
+        snapshot = null;
+      }
     }
 
-    render(await response.json());
+    let live = false;
+    if (!snapshot || forceLive || isSnapshotStale(snapshot)) {
+      try {
+        snapshot = await fetchLiveSnapshot();
+        live = true;
+      } catch (error) {
+        if (!snapshot) {
+          throw error;
+        }
+        showToast("Não foi possível atualizar agora; exibindo o último snapshot.", "error");
+      }
+    }
+
+    render(snapshot);
 
     if (manual) {
-      showToast("Dados recarregados com sucesso.", "success");
+      showToast(
+        live ? "Dados atualizados direto da brapi." : "Dados recarregados com sucesso.",
+        "success",
+      );
     }
   } catch (error) {
     statusEl.textContent = `Falha ao carregar: ${error.message}`;
@@ -440,7 +582,7 @@ async function load({ manual = false } = {}) {
 }
 
 refreshEl.addEventListener("click", () => {
-  void load({ manual: true });
+  void load({ manual: true, forceLive: true });
 });
 
 for (const button of modeButtons) {

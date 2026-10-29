@@ -15,7 +15,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
 - **Voltar ao topo:** botão flutuante com scroll suave.
-- **Atualização automática:** o site recarrega o JSON a cada 5 minutos; o workflow gera dados novos a cada 30 minutos.
+- **Atualização automática:** o site verifica o snapshot a cada 30 minutos; se ele estiver velho ou ausente, consulta a brapi diretamente no navegador.
 - **Docker:** sobe o dashboard local com atualização a cada 30 minutos.
 - **Modo CSV legado:** ainda é possível baixar os CSVs do InfoMoney/XP com os filtros originais.
 - **Sem dependências Go externas:** o binário usa apenas a biblioteca padrão.
@@ -32,10 +32,13 @@ flowchart LR
   json --> artifact["Artifact docs/"]
   artifact --> pages["GitHub Pages"]
   pages --> user["Navegador"]
-  user -->|auto-refresh 5 min| pages
+  user -->|auto-refresh 30 min| pages
+  user -.->|snapshot velho| brapi
 ```
 
 O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta as duas abas do dashboard.
+
+O frontend usa o snapshot como cache: se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. O botão **Atualizar** força essa consulta direta.
 
 ## Arquitetura
 
@@ -166,7 +169,7 @@ O workflow `.github/workflows/dashboard.yml` roda:
 - em `push` para `main`/`master`
 - manualmente via `workflow_dispatch`
 
-O cron é “best effort”: o GitHub pode atrasar ou descartar execuções em horários de pico. O botão **Workflow** no site leva à página do Actions para disparo manual.
+O cron é “best effort”: o GitHub pode atrasar ou descartar execuções em horários de pico. Por isso o frontend tem o fallback direto na brapi quando o snapshot está velho. O botão **Workflow** continua levando à página do Actions para disparo manual.
 
 ## Contrato JSON
 
@@ -223,6 +226,7 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 | Tickers fracionários | descartados |
 | Feriados B3 | o workflow roda mesmo assim e repete o último snapshot |
 | Rate limit brapi | 20 req/min; usamos 12 por execução |
+| Fallback do navegador | consulta a brapi quando o snapshot tem mais de 35 min |
 
 ## Qualidade
 
