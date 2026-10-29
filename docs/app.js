@@ -1,4 +1,5 @@
 const DATA_URL = "data/latest.json";
+const SNAPSHOT_FALLBACK_URL = "https://stckcraw-dispatch.fabianoflorentino.workers.dev/snapshot";
 const REFRESH_MS = 30 * 60 * 1000;
 const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
 
@@ -489,14 +490,33 @@ function isSnapshotStale(snapshot) {
 }
 
 async function fetchSnapshot() {
-  const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {
-    cache: "no-store",
-    headers: { "Cache-Control": "no-cache" },
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+  let primaryError = null;
+
+  try {
+    const response = await fetch(`${DATA_URL}?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    primaryError = error;
   }
-  return response.json();
+
+  try {
+    const response = await fetch(`${SNAPSHOT_FALLBACK_URL}?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json();
+  } catch {
+    throw primaryError;
+  }
 }
 
 async function fetchGroupLive(group, sortOrder) {

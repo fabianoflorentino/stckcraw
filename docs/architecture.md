@@ -134,9 +134,11 @@ flowchart LR
   actions -->|wrangler deploy docs/| cf["Cloudflare static Worker"]
   pages --> user["Navegador"]
   cf --> user
+  cf -->|404 em /data/latest.json| dispatch["stckcraw-dispatch /snapshot"]
+  dispatch -->|proxy| pages
 ```
 
-O workflow só faz o deploy do espelho quando o secret `CLOUDFLARE_API_TOKEN` existe; sem ele, a etapa é ignorada e o Pages continua sendo a fonte principal.
+O workflow só faz o deploy do espelho quando o secret `CLOUDFLARE_API_TOKEN` existe; sem ele, a etapa é ignorada e o Pages continua sendo a fonte principal. O `/snapshot` do dispatcher é o fallback do espelho quando o JSON gerado não está nos assets (caso típico de um build Git do Cloudflare sem `docs/data/latest.json`).
 
 ## 7. Fallback no navegador
 

@@ -1,4 +1,5 @@
 const GITHUB_API = "https://api.github.com";
+const SNAPSHOT_URL = "https://fabianoflorentino.github.io/stckcraw/data/latest.json";
 
 export default {
   async scheduled(controller, env, _ctx) {
@@ -11,6 +12,10 @@ export default {
 
     if (url.pathname === "/health") {
       return new Response("ok", { headers: { "content-type": "text/plain" } });
+    }
+
+    if (url.pathname === "/snapshot") {
+      return snapshot();
     }
 
     if (url.pathname !== "/trigger" || request.method !== "POST") {
@@ -34,6 +39,36 @@ export default {
     }
   },
 };
+
+async function snapshot() {
+  try {
+    const response = await fetch(`${SNAPSHOT_URL}?t=${Date.now()}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "stckcraw-cloudflare-snapshot",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub Pages snapshot failed: ${response.status}`);
+    }
+
+    return new Response(await response.text(), {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=30, stale-while-revalidate=60",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ event: "snapshot_error", error: message }));
+    return Response.json(
+      { error: "snapshot unavailable" },
+      { status: 502, headers: { "access-control-allow-origin": "*" } },
+    );
+  }
+}
 
 async function dispatch(env) {
   const { GITHUB_OWNER, GITHUB_REPO, GITHUB_WORKFLOW, GITHUB_REF, GITHUB_TOKEN } = env;

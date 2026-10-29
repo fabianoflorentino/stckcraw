@@ -123,6 +123,8 @@ npx wrangler deploy
 
 O workflow também faz esse deploy em cada execução, desde que o secret `CLOUDFLARE_API_TOKEN` exista no repositório. O token precisa de **Workers Scripts: Edit** para a conta `00539ff152759d320729c77d2d5ad481` (já no `wrangler.toml` do site). Se o secret não existir, a etapa é ignorada e o Pages continua funcionando.
 
+Como o `docs/data/latest.json` é gerado e a integração Git do Cloudflare (Workers Builds) pode subir só os arquivos versionados, o frontend tem um fallback: se `/data/latest.json` retornar 404 no espelho, ele busca `GET https://stckcraw-dispatch.fabianoflorentino.workers.dev/snapshot`. Esse endpoint do dispatcher devolve o JSON atual do GitHub Pages com CORS. Assim o espelho continua mostrando os índices e a B3 mesmo sem o arquivo local.
+
 Se você não quiser manter o espelho, pode apagar o Worker `stckcraw` e usar apenas o GitHub Pages.
 
 ## Custo
