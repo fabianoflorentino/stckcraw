@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local development only. Never commit .dev.vars.
+GITHUB_TOKEN=github_pat_replace_me
+TRIGGER_SECRET=replace_me

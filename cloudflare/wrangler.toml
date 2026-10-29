@@ -1,0 +1,17 @@
+name = "stckcraw-dispatch"
+main = "src/index.js"
+compatibility_date = "2026-10-29"
+
+[vars]
+GITHUB_OWNER = "fabianoflorentino"
+GITHUB_REPO = "stckcraw"
+GITHUB_WORKFLOW = "dashboard.yml"
+GITHUB_REF = "main"
+
+[triggers]
+# Cloudflare cron is UTC. 11:05-19:35 UTC = 08:05-16:35 BRT.
+# The extra 20:05 UTC run = 17:05 BRT.
+crons = [
+  "5,35 11-19 * * 1-5",
+  "5 20 * * 1-5",
+]

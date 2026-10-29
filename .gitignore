@@ -47,3 +47,8 @@ go.work.sum
 # Agent skill installs (restore from skills-lock.json)
 /.agents/
 /.claude/
+
+# Cloudflare Worker
+/cloudflare/.wrangler/
+/cloudflare/.dev.vars
+/cloudflare/node_modules/

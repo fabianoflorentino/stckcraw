@@ -100,6 +100,19 @@ sequenceDiagram
 
 O workflow também dispara em `push` para `main`/`master` e em `workflow_dispatch` manual. O cron usa `timezone: America/Sao_Paulo` e minutos `:05`/`:35` para reduzir a chance de o GitHub descartar a execução no topo da hora.
 
+### Agendamento alternativo com Cloudflare
+
+Se o scheduler do GitHub não disparar, o Worker opcional `cloudflare/` assume o papel de cron e chama `workflow_dispatch` pela API do GitHub:
+
+```mermaid
+flowchart LR
+  cf["Cloudflare Cron<br/>seg-sex 08:05-17:05 BRT"] -->|POST workflow_dispatch| gh["GitHub Actions"]
+  gh --> snapshot["docs/data/latest.json"]
+  snapshot --> pages["GitHub Pages"]
+```
+
+O PAT fica como secret do Worker; não entra no repositório nem no `docs/app.js`. O Worker não gera dados: apenas inicia o workflow, que continua consultando a brapi e publicando o Pages.
+
 ## 7. Fallback no navegador
 
 ```mermaid
@@ -229,6 +242,7 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - **Persistência de UI:** o estado dos cards colapsados fica no `localStorage`.
 - **Cron com timezone explícito:** `America/Sao_Paulo` evita conversão manual de horário de verão e deixa a intenção legível.
 - **Fallback no navegador:** o site não depende exclusivamente do scheduler do GitHub; se o snapshot envelhecer, a própria página busca a brapi.
+- **Cloudflare Worker opcional:** um cron independente do GitHub chama `workflow_dispatch`; é a alternativa para manter o snapshot estático confiável sem depender do scheduler do GitHub.
 
 ## 12. Limitações e próximos passos
 
