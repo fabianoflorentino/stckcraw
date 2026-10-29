@@ -1,3 +1,5 @@
+# Script Worker (cron dispatcher), not a static-assets Worker.
+# Do not add an [assets] section here: the site is served by GitHub Pages.
 name = "stckcraw-dispatch"
 main = "src/index.js"
 compatibility_date = "2026-10-29"
