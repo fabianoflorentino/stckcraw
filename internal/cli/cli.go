@@ -32,26 +32,27 @@ const (
 var Version = "dev"
 
 type options struct {
-	outDir         string
-	market         string
-	securityType   string
-	index          string
-	pageSize       int
-	concurrency    int
-	format         export.Format
-	pageURL        string
-	baseURL        string
-	apiKey         string
-	requestTimeout time.Duration
-	maxPages       int
-	list           bool
-	showVersion    bool
-	variants       []marketdata.Variant
-	dashboard      bool
-	dashboardLimit int
-	brapiBaseURL   string
-	yahooBaseURL   string
-	noIndices      bool
+	outDir             string
+	market             string
+	securityType       string
+	index              string
+	pageSize           int
+	concurrency        int
+	format             export.Format
+	pageURL            string
+	baseURL            string
+	apiKey             string
+	requestTimeout     time.Duration
+	maxPages           int
+	list               bool
+	showVersion        bool
+	variants           []marketdata.Variant
+	dashboard          bool
+	dashboardLimit     int
+	brapiBaseURL       string
+	yahooBaseURL       string
+	indicesFallbackURL string
+	noIndices          bool
 }
 
 type usageError struct {
@@ -98,25 +99,26 @@ func parse(args []string, stderr io.Writer) (options, error) {
 	flags.SetOutput(stderr)
 
 	var (
-		outDir         = flags.String("out", "data", "output directory for CSV files or dashboard JSON")
-		market         = flags.String("market", "all", "market: b3, nasdaq, nyse or all")
-		securityType   = flags.String("type", "all", "B3 security type: all, acao, fii, fip, bdr, etf or unit")
-		index          = flags.String("index", "all", "B3 index: all or a code such as IBOV")
-		pageSize       = flags.Int("page-size", 100, "quotes requested per API page")
-		concurrency    = flags.Int("concurrency", 4, "variants fetched in parallel")
-		formatArg      = flags.String("format", "site", "CSV format: site or raw")
-		pageURL        = flags.String("page-url", marketdata.DefaultPageURL, "page used to discover the API credentials")
-		baseURL        = flags.String("base-url", "", "override the market data API base URL")
-		apiKey         = flags.String("api-key", "", "override the market data API subscription key")
-		requestTimeout = flags.Duration("request-timeout", 30*time.Second, "timeout for each HTTP request")
-		maxPages       = flags.Int("max-pages", 1000, "maximum pages fetched per variant")
-		list           = flags.Bool("list", false, "list variants and exit")
-		showVersion    = flags.Bool("version", false, "print version and exit")
-		dashboardMode  = flags.Bool("dashboard", false, "generate the dashboard JSON instead of CSV")
-		dashboardLimit = flags.Int("limit", 10, "items per dashboard group")
-		brapiBaseURL   = flags.String("brapi-base-url", brapi.DefaultBaseURL, "brapi.dev API base URL")
-		yahooBaseURL   = flags.String("yahoo-base-url", marketindex.DefaultBaseURL, "Yahoo Finance index API base URL")
-		noIndices      = flags.Bool("no-indices", false, "skip market index cards")
+		outDir             = flags.String("out", "data", "output directory for CSV files or dashboard JSON")
+		market             = flags.String("market", "all", "market: b3, nasdaq, nyse or all")
+		securityType       = flags.String("type", "all", "B3 security type: all, acao, fii, fip, bdr, etf or unit")
+		index              = flags.String("index", "all", "B3 index: all or a code such as IBOV")
+		pageSize           = flags.Int("page-size", 100, "quotes requested per API page")
+		concurrency        = flags.Int("concurrency", 4, "variants fetched in parallel")
+		formatArg          = flags.String("format", "site", "CSV format: site or raw")
+		pageURL            = flags.String("page-url", marketdata.DefaultPageURL, "page used to discover the API credentials")
+		baseURL            = flags.String("base-url", "", "override the market data API base URL")
+		apiKey             = flags.String("api-key", "", "override the market data API subscription key")
+		requestTimeout     = flags.Duration("request-timeout", 30*time.Second, "timeout for each HTTP request")
+		maxPages           = flags.Int("max-pages", 1000, "maximum pages fetched per variant")
+		list               = flags.Bool("list", false, "list variants and exit")
+		showVersion        = flags.Bool("version", false, "print version and exit")
+		dashboardMode      = flags.Bool("dashboard", false, "generate the dashboard JSON instead of CSV")
+		dashboardLimit     = flags.Int("limit", 10, "items per dashboard group")
+		brapiBaseURL       = flags.String("brapi-base-url", brapi.DefaultBaseURL, "brapi.dev API base URL")
+		yahooBaseURL       = flags.String("yahoo-base-url", marketindex.DefaultBaseURL, "Yahoo Finance index API base URL")
+		indicesFallbackURL = flags.String("indices-fallback-url", "https://stckcraw.fabianoflorentino.workers.dev/data/latest.json", "last known-good snapshot used when Yahoo rate-limits")
+		noIndices          = flags.Bool("no-indices", false, "skip market index cards")
 	)
 
 	flags.Usage = func() {
@@ -178,14 +180,15 @@ func parse(args []string, stderr io.Writer) (options, error) {
 		}
 
 		return options{
-			outDir:         *outDir,
-			requestTimeout: *requestTimeout,
-			showVersion:    *showVersion,
-			dashboard:      true,
-			dashboardLimit: *dashboardLimit,
-			brapiBaseURL:   *brapiBaseURL,
-			yahooBaseURL:   *yahooBaseURL,
-			noIndices:      *noIndices,
+			outDir:             *outDir,
+			requestTimeout:     *requestTimeout,
+			showVersion:        *showVersion,
+			dashboard:          true,
+			dashboardLimit:     *dashboardLimit,
+			brapiBaseURL:       *brapiBaseURL,
+			yahooBaseURL:       *yahooBaseURL,
+			indicesFallbackURL: *indicesFallbackURL,
+			noIndices:          *noIndices,
 		}, nil
 	}
 
@@ -323,10 +326,22 @@ func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) e
 
 	builderOpts := []dashboard.Option{dashboard.WithLimit(opts.dashboardLimit)}
 	if !opts.noIndices {
-		indexClient, indexErr := marketindex.NewClient(
+		indexOpts := []marketindex.Option{
 			marketindex.WithBaseURL(opts.yahooBaseURL),
 			marketindex.WithHTTPClient(&http.Client{Timeout: opts.requestTimeout}),
-		)
+		}
+
+		if opts.indicesFallbackURL != "" {
+			fallbackClient := &http.Client{Timeout: 5 * time.Second}
+			fallbackQuotes, fallbackErr := marketindex.FetchSnapshotIndices(ctx, fallbackClient, opts.indicesFallbackURL)
+			if fallbackErr == nil && len(fallbackQuotes) > 0 {
+				indexOpts = append(indexOpts, marketindex.WithFallback(fallbackQuotes))
+			} else if fallbackErr != nil {
+				writeFormat(stderr, "warn fallback de índices indisponível: %v\n", fallbackErr)
+			}
+		}
+
+		indexClient, indexErr := marketindex.NewClient(indexOpts...)
 		if indexErr != nil {
 			return fmt.Errorf("create market index client: %w", indexErr)
 		}

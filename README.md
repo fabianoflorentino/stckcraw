@@ -43,6 +43,8 @@ O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções 
 
 O frontend usa o snapshot como cache: se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
 
+Quando a Yahoo responde `429`, o crawler não sobrescreve os índices com erro: ele usa o último snapshot bom do próprio espelho Cloudflare (`indices-fallback-url`). Assim os cards continuam mostrando o último valor disponível, com o horário da cotação, em vez de "indisponível".
+
 ## Arquitetura
 
 O documento completo, com diagramas de contexto, sequência, pacotes, deploy e tratamento de falhas, está em **[docs/architecture.md](docs/architecture.md)**.
@@ -251,6 +253,7 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 | Rate limit brapi | 20 req/min; usamos 12 por execução |
 | Fallback do navegador | consulta a brapi quando o snapshot tem mais de 35 min |
 | Fallback de índices | a Yahoo não expõe CORS; o navegador mantém os índices do último snapshot |
+| Yahoo `429` | o crawler usa o último snapshot bom do espelho Cloudflare, em vez de gravar `error` |
 
 ## Qualidade
 

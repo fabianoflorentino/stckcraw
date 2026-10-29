@@ -54,6 +54,7 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	userAgent  string
+	fallback   map[string]Quote
 }
 
 // Option configures a Client.
@@ -74,6 +75,20 @@ func WithHTTPClient(client *http.Client) Option {
 func WithBaseURL(baseURL string) Option {
 	return func(c *Client) error {
 		c.baseURL = baseURL
+		return nil
+	}
+}
+
+// WithFallback keeps the last known-good quotes, used when Yahoo rate-limits
+// or fails for one of the indices.
+func WithFallback(quotes []Quote) Option {
+	return func(c *Client) error {
+		c.fallback = make(map[string]Quote, len(quotes))
+		for _, quote := range quotes {
+			if quote.Key != "" && quote.Error == "" {
+				c.fallback[quote.Key] = quote
+			}
+		}
 		return nil
 	}
 }
@@ -125,6 +140,10 @@ func (c *Client) FetchAll(ctx context.Context, definitions []Definition) ([]Quot
 		if err != nil {
 			if ctx.Err() != nil {
 				return quotes, ctx.Err()
+			}
+			if cached, ok := c.fallback[definition.Key]; ok {
+				quotes = append(quotes, cached)
+				continue
 			}
 			quotes = append(quotes, Quote{
 				Key:    definition.Key,
@@ -210,6 +229,42 @@ func (c *Client) Fetch(ctx context.Context, definition Definition) (Quote, error
 		Timezone: meta.ExchangeTimezoneName,
 		AsOf:     asOf,
 	}, nil
+}
+
+// FetchSnapshotIndices reads the indices from a normalized latest.json snapshot.
+func FetchSnapshotIndices(ctx context.Context, client *http.Client, snapshotURL string) ([]Quote, error) {
+	if strings.TrimSpace(snapshotURL) == "" {
+		return nil, errors.New("snapshot URL is required")
+	}
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build snapshot request: %w", err)
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", defaultUserAgent)
+
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("do snapshot request: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("snapshot status %d", response.StatusCode)
+	}
+
+	var payload struct {
+		Indices []Quote `json:"indices"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode snapshot: %w", err)
+	}
+
+	return payload.Indices, nil
 }
 
 type chartResponse struct {

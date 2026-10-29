@@ -154,6 +154,65 @@ func TestClientFetchErrors(t *testing.T) {
 	}
 }
 
+func TestClientFetchAllUsesFallback(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		if _, err := fmt.Fprint(w, "rate limited"); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	fallback := []marketindex.Quote{
+		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", Price: 169000, Change: -1.5},
+	}
+
+	client, err := marketindex.NewClient(
+		marketindex.WithBaseURL(server.URL),
+		marketindex.WithFallback(fallback),
+	)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	quotes, err := client.FetchAll(context.Background(), []marketindex.Definition{
+		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP"},
+	})
+	if err != nil {
+		t.Fatalf("FetchAll() error = %v", err)
+	}
+	if len(quotes) != 1 {
+		t.Fatalf("quotes = %d, want 1", len(quotes))
+	}
+	if quotes[0].Error != "" || quotes[0].Price != 169000 {
+		t.Errorf("fallback quote = %+v", quotes[0])
+	}
+}
+
+func TestFetchSnapshotIndices(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprint(w, `{"indices":[
+			{"key":"ibovespa","label":"Ibovespa","symbol":"^BVSP","price":169000,"change":-1.5,"asOf":"2026-10-29T17:00:00Z"}
+		]}`); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	quotes, err := marketindex.FetchSnapshotIndices(context.Background(), server.Client(), server.URL)
+	if err != nil {
+		t.Fatalf("FetchSnapshotIndices() error = %v", err)
+	}
+	if len(quotes) != 1 || quotes[0].Price != 169000 {
+		t.Fatalf("quotes = %+v", quotes)
+	}
+}
+
 func TestNewClientValidation(t *testing.T) {
 	t.Parallel()
 

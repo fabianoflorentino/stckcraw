@@ -166,6 +166,7 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 		"-dashboard",
 		"-brapi-base-url", server.URL,
 		"-yahoo-base-url", indexServer.URL,
+		"-indices-fallback-url", "",
 		"-out", outDir,
 		"-limit", "2",
 	}, &stdout, &stderr)

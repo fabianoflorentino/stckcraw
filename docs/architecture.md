@@ -264,7 +264,8 @@ flowchart TD
 | volume Docker sem permissão | `docker compose down -v` recria o volume |
 | cron atrasado/descartado | `push` ou `workflow_dispatch` atualizam manualmente |
 | snapshot velho/ausente | navegador consulta a brapi diretamente |
-| Yahoo falha em um índice | card com `error`; demais índices e a B3 são publicados |
+| Yahoo falha em um índice | usa o último valor bom do snapshot de fallback; sem fallback, card com `error` |
+| Yahoo `429` em todos os índices | crawler preserva o último snapshot bom do espelho, em vez de sobrescrever com erros |
 
 ## 11. Decisões
 
