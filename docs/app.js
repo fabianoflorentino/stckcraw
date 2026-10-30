@@ -1,6 +1,6 @@
 const DATA_URL = "data/latest.json";
 const SNAPSHOT_FALLBACK_URL = "https://stckcraw-dispatch.fabianoflorentino.workers.dev/snapshot";
-const REFRESH_MS = 30 * 60 * 1000;
+const REFRESH_MS = 5 * 60 * 1000;
 const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
 
 const LIVE_GROUPS = [

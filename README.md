@@ -16,7 +16,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
 - **Voltar ao topo:** botão flutuante com scroll suave.
-- **Atualização automática:** o site verifica o snapshot a cada 30 minutos; se ele estiver velho ou ausente, consulta a brapi diretamente no navegador.
+- **Atualização automática:** o site verifica o snapshot a cada 5 minutos; o workflow tenta gerar um novo a cada 30. Se o snapshot estiver velho ou ausente, o navegador consulta a brapi diretamente.
 - **Docker:** sobe o dashboard local com atualização a cada 30 minutos.
 - **Cloudflare:** cron dispatcher (`stckcraw-dispatch`) e espelho estático opcional (`stckcraw`).
 - **Modo CSV legado:** ainda é possível baixar os CSVs do InfoMoney/XP com os filtros originais.
@@ -35,13 +35,13 @@ flowchart LR
   json --> artifact["Artifact docs/"]
   artifact --> pages["GitHub Pages"]
   pages --> user["Navegador"]
-  user -->|auto-refresh 30 min| pages
+  user -->|auto-refresh 5 min| pages
   user -.->|snapshot velho| brapi
 ```
 
 O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
 
-O frontend usa o snapshot como cache: se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
+O frontend usa o snapshot como cache: ele verifica a cada 5 minutos e, se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
 
 Quando a Yahoo responde `429`, o crawler não sobrescreve os índices com erro: ele usa o último snapshot bom do próprio espelho Cloudflare (`indices-fallback-url`). Assim os cards continuam mostrando o último valor disponível, com o horário da cotação, em vez de "indisponível".
 
