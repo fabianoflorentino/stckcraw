@@ -4,7 +4,7 @@
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-online-3ddc97?logo=github)](https://fabianoflorentino.github.io/stckcraw/)
 
-Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas da B3 por tipo de ativo**. O site é atualizado a cada 30 minutos em dias úteis e publicado no GitHub Pages.
+Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas da B3 por tipo de ativo**. O site é atualizado a cada 30 minutos em dias úteis, das 10h às 18h (horário de Brasília), e publicado no GitHub Pages.
 
 **Demo:** https://fabianoflorentino.github.io/stckcraw/  
 **Workflow:** https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml
@@ -13,6 +13,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
 - **Índices de mercado:** Ibovespa, S&P 500, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
+- **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
 - **Voltar ao topo:** botão flutuante com scroll suave.
@@ -26,7 +27,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 
 ```mermaid
 flowchart LR
-  cron["GitHub Actions<br/>seg-sex 08:05-17:05 BRT"] --> runner["Runner Ubuntu"]
+  cron["GitHub Actions<br/>seg-sex 10:05-18:05 BRT"] --> runner["Runner Ubuntu"]
   runner --> test["go test ./..."]
   runner --> crawler["stckcraw -dashboard"]
   crawler -->|12 requisições| brapi["brapi.dev"]
@@ -42,6 +43,8 @@ flowchart LR
 O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
 
 O frontend usa o snapshot como cache: ele verifica a cada 5 minutos e, se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
+
+Quando o `asOf` do Ibovespa é de um dia anterior ao `generatedAt`, o status mostra **“B3 fechada · último pregão dd/mm/aaaa”**. Isso cobre fins de semana e feriados sem manter um calendário fixo; os índices de mercados que abriram continuam sendo atualizados.
 
 Quando a Yahoo responde `429`, o crawler não sobrescreve os índices com erro: ele usa o último snapshot bom do próprio espelho Cloudflare (`indices-fallback-url`). Assim os cards continuam mostrando o último valor disponível, com o horário da cotação, em vez de "indisponível".
 
@@ -172,7 +175,7 @@ O updater roda imediatamente ao subir e alinha as próximas execuções aos múl
 O workflow `.github/workflows/dashboard.yml` roda:
 
 - **dias úteis** (seg–sex)
-- **08:05–17:05** no fuso `America/Sao_Paulo`
+- **10:05–18:05** no fuso `America/Sao_Paulo`
 - a cada 30 minutos (minutos `:05` e `:35`, para fugir do topo da hora)
 - em `push` para `main`/`master`
 - manualmente via `workflow_dispatch`

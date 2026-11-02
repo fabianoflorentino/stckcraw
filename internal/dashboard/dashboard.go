@@ -17,6 +17,7 @@ import (
 const (
 	defaultLimit  = 10
 	overFetchRate = 5
+	b3IndexKey    = "ibovespa"
 )
 
 // TopFetcher fetches ranked assets for one brapi query.
@@ -57,6 +58,11 @@ type Snapshot struct {
 	Groups      []Group             `json:"groups"`
 	Lows        []Group             `json:"lows"`
 	Indices     []marketindex.Quote `json:"indices"`
+	// B3AsOf is the Ibovespa timestamp, used as the last B3 session marker.
+	B3AsOf time.Time `json:"b3AsOf"`
+	// B3Closed reports that the last B3 session is from an earlier UTC day,
+	// which happens on weekends and B3 holidays.
+	B3Closed bool `json:"b3Closed,omitempty"`
 }
 
 // Builder assembles a Snapshot from a TopFetcher.
@@ -218,9 +224,30 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 			return snapshot, fmt.Errorf("fetch market indices: %w", err)
 		}
 		snapshot.Indices = indices
+		snapshot.B3AsOf, snapshot.B3Closed = b3Session(indices, snapshot.GeneratedAt)
 	}
 
 	return snapshot, nil
+}
+
+// b3Session returns the last B3 session timestamp and whether it falls on an
+// earlier UTC day than generatedAt. The Ibovespa quote is the reference:
+// B3 trading and after-market sessions end before 00:00 UTC, so a date
+// mismatch means the exchange did not trade on generatedAt's date.
+func b3Session(indices []marketindex.Quote, generatedAt time.Time) (time.Time, bool) {
+	for _, index := range indices {
+		if index.Key != b3IndexKey || index.Error != "" || index.AsOf.IsZero() {
+			continue
+		}
+		return index.AsOf, utcDate(index.AsOf).Before(utcDate(generatedAt))
+	}
+
+	return time.Time{}, false
+}
+
+func utcDate(value time.Time) time.Time {
+	year, month, day := value.UTC().Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func (b *Builder) groupResult(group brapi.Group, assets []brapi.Asset, err error) Group {

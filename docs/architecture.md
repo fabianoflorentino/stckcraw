@@ -94,7 +94,7 @@ sequenceDiagram
   participant Y as Yahoo Finance
   participant P as GitHub Pages
 
-  S->>R: cron seg-sex 08:05-17:05 BRT
+  S->>R: cron seg-sex 10:05-18:05 BRT
   R->>R: checkout + go test ./...
   R->>C: -dashboard -out docs/data -limit 10
   loop 6 grupos x 2 direções
@@ -117,7 +117,7 @@ Se o scheduler do GitHub não disparar, o Worker opcional `cloudflare/` assume o
 
 ```mermaid
 flowchart LR
-  cf["Cloudflare Cron<br/>seg-sex 08:05-17:05 BRT"] -->|POST workflow_dispatch| gh["GitHub Actions"]
+  cf["Cloudflare Cron<br/>seg-sex 10:05-18:05 BRT"] -->|POST workflow_dispatch| gh["GitHub Actions"]
   gh --> snapshot["docs/data/latest.json"]
   snapshot --> pages["GitHub Pages"]
 ```
@@ -192,6 +192,8 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
   "generatedAt": "2026-10-28T21:41:09Z",
   "source": "brapi.dev",
   "limit": 10,
+  "b3AsOf": "2026-10-28T17:22:00Z",
+  "b3Closed": false,
   "indices": [
     {
       "key": "ibovespa",
@@ -201,7 +203,7 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
       "change": -1.12,
       "currency": "BRL",
       "timezone": "America/Sao_Paulo",
-      "asOf": "2026-10-29T17:22:00Z"
+      "asOf": "2026-10-28T17:22:00Z"
     }
   ],
   "groups": [
@@ -241,6 +243,8 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
 | `indices[].change` | `price / chartPreviousClose` | variação percentual |
 | `indices[].asOf` | `regularMarketTime` | horário UTC da última cotação |
 | `indices[].timezone` | `exchangeTimezoneName` | fuso usado no card |
+| `b3AsOf` | `indices[ibovespa].asOf` | horário UTC do último pregão da B3 |
+| `b3Closed` | calculado | `true` quando o último pregão é de um dia UTC anterior ao `generatedAt` |
 
 ## 10. Falhas e resiliência
 
@@ -266,6 +270,7 @@ flowchart TD
 | snapshot velho/ausente | navegador consulta a brapi diretamente |
 | Yahoo falha em um índice | usa o último valor bom do snapshot de fallback; sem fallback, card com `error` |
 | Yahoo `429` em todos os índices | crawler preserva o último snapshot bom do espelho, em vez de sobrescrever com erros |
+| B3 fechada (fim de semana/feriado) | `b3Closed=true`; o site mantém o último pregão e mostra o aviso, enquanto os índices que operaram são atualizados |
 
 ## 11. Decisões
 
@@ -291,6 +296,7 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - **Filtro de fracionários:** tickers terminados em `F` não entram no top 10.
 - **Persistência de UI:** o estado dos cards colapsados fica no `localStorage`.
 - **Cron com timezone explícito:** `America/Sao_Paulo` evita conversão manual de horário de verão e deixa a intenção legível.
+- **Feriado da B3 sem calendário fixo:** o timestamp do Ibovespa (`^BVSP`) indica o último pregão; se for de um dia UTC anterior ao `generatedAt`, o snapshot marca `b3Closed` e a UI avisa. Não é necessário manter uma lista de feriados.
 - **Fallback no navegador:** o site não depende exclusivamente do scheduler do GitHub; se o snapshot envelhecer, a própria página busca a brapi.
 - **Cloudflare Worker opcional:** um cron independente do GitHub chama `workflow_dispatch`; é a alternativa para manter o snapshot estático confiável sem depender do scheduler do GitHub.
 
@@ -301,7 +307,7 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - O volume é aproximado.
 - Os índices vêm da Yahoo Finance (não oficial) e usam o último valor disponível de cada bolsa; sessões e feriados são diferentes entre B3, EUA, Europa e China.
 - O navegador não atualiza os índices no fallback porque a Yahoo não libera CORS.
-- Feriados da B3 não são tratados: o workflow roda e repete o último snapshot.
+- Feriados da B3 são detectados pelo `b3AsOf` do Ibovespa: o site mantém o último pregão e mostra o aviso, mas o workflow continua rodando para atualizar os índices que abriram.
 - O scheduler do GitHub é best effort; um gatilho externo via `workflow_dispatch` é o fallback.
 
 Possíveis evoluções:

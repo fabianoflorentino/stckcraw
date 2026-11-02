@@ -4,7 +4,7 @@ Worker opcional que dispara o workflow `dashboard.yml` usando um cron da Cloudfl
 
 ```mermaid
 flowchart LR
-  cf["Cloudflare Cron<br/>seg-sex 08:05-17:05 BRT"] -->|POST workflow_dispatch| gh["GitHub Actions"]
+  cf["Cloudflare Cron<br/>seg-sex 10:05-18:05 BRT"] -->|POST workflow_dispatch| gh["GitHub Actions"]
   gh --> snapshot["docs/data/latest.json"]
   snapshot --> pages["GitHub Pages"]
   browser["Navegador"] --> pages
@@ -79,9 +79,9 @@ npx wrangler tail
 
 O cron configurado no `wrangler.toml` roda:
 
-- `5,35 11-19 UTC` → 08:05–16:35 BRT
-- `5 20 UTC` → 17:05 BRT
-- somente segunda a sexta (`1-5`)
+- `5,35 13-20 UTC` → 10:05–17:35 BRT
+- `5 21 UTC` → 18:05 BRT
+- somente segunda a sexta (`2-6`; no Cloudflare, `1` = domingo e `7` = sábado)
 
 ## 5. Testar
 
@@ -98,7 +98,7 @@ Também é possível testar sem deploy:
 
 ```bash
 npx wrangler dev --test-scheduled
-curl "http://localhost:8787/__scheduled?cron=5,35+11-19+*+*+1-5"
+curl "http://localhost:8787/__scheduled?cron=5,35+13-20+*+*+2-6"
 ```
 
 `/health` responde `ok` e serve para verificar se o Worker está no ar.
@@ -129,7 +129,7 @@ Se você não quiser manter o espelho, pode apagar o Worker `stckcraw` e usar ap
 
 ## Custo
 
-O plano free da Cloudflare é suficiente: cerca de 19 execuções por dia útil, sem armazenamento e sem banco de dados.
+O plano free da Cloudflare é suficiente: cerca de 17 execuções por dia útil, sem armazenamento e sem banco de dados.
 
 ## Troubleshooting
 

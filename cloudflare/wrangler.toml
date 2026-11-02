@@ -11,11 +11,13 @@ GITHUB_WORKFLOW = "dashboard.yml"
 GITHUB_REF = "main"
 
 [triggers]
-# Cloudflare cron is UTC. 11:05-19:35 UTC = 08:05-16:35 BRT.
-# The extra 20:05 UTC run = 17:05 BRT.
+# Cloudflare cron is UTC (B3 time is America/Sao_Paulo, UTC-3).
+# 13:05-20:35 UTC = 10:05-17:35 BRT.
+# The extra 21:05 UTC run = 18:05 BRT (after-market close).
+# Cloudflare weekdays: 1=Sunday ... 7=Saturday. Use 2-6 for Monday-Friday.
 crons = [
-  "5,35 11-19 * * 1-5",
-  "5 20 * * 1-5",
+  "5,35 13-20 * * 2-6",
+  "5 21 * * 2-6",
 ]
 
 [observability]

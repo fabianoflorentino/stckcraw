@@ -23,12 +23,10 @@ const modeDescriptionEl = document.getElementById("mode-description");
 
 const MODES = {
   highs: {
-    description: "Top 10 maiores altas do dia",
     topLabel: "Maior alta",
     coverage: "altas",
   },
   lows: {
-    description: "Top 10 maiores baixas do dia",
     topLabel: "Maior queda",
     coverage: "baixas",
   },
@@ -129,6 +127,24 @@ function formatDate(value) {
   });
 }
 
+function formatB3SessionDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return date.toLocaleDateString("pt-BR");
+  }
+}
+
 function relativeTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -174,7 +190,10 @@ function showToast(message, tone) {
 function updateStatus(snapshot) {
   const generated = snapshot.generatedAt;
   const relative = relativeTime(generated);
-  statusEl.textContent = `Atualizado ${formatDate(generated)}${relative ? ` · ${relative}` : ""}`;
+  const b3Note = snapshot.b3Closed && snapshot.b3AsOf
+    ? ` · B3 fechada · último pregão ${formatB3SessionDate(snapshot.b3AsOf)}`
+    : "";
+  statusEl.textContent = `Atualizado ${formatDate(generated)}${relative ? ` · ${relative}` : ""}${b3Note}`;
   statusEl.classList.remove("error");
 }
 
@@ -287,7 +306,7 @@ function renderHighlights(groups, mode) {
     highlightCard(
       "Cobertura",
       `${items.length} ativos`,
-      `${groups.length} grupos · top 10 ${config.coverage} do dia`,
+      `${groups.length} grupos · top 10 ${config.coverage} ${lastSnapshot?.b3Closed ? "do último pregão" : "do dia"}`,
       "neutral",
     ),
   );
@@ -457,6 +476,13 @@ function renderActiveGroups() {
   }
 
   renderHighlights(groups, activeMode);
+  modeDescriptionEl.textContent = modeDescription(activeMode);
+}
+
+function modeDescription(mode) {
+  const config = MODES[mode] || MODES.highs;
+  const period = lastSnapshot?.b3Closed ? "do último pregão" : "do dia";
+  return `Top 10 maiores ${config.coverage} ${period}`;
 }
 
 function setMode(mode) {
@@ -470,7 +496,6 @@ function setMode(mode) {
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-selected", String(isActive));
   }
-  modeDescriptionEl.textContent = MODES[mode].description;
   renderActiveGroups();
 }
 
@@ -589,7 +614,7 @@ async function fetchGroupLive(group, sortOrder) {
   return items;
 }
 
-async function fetchLiveSnapshot(previousIndices = []) {
+async function fetchLiveSnapshot(previousIndices = [], previousSnapshot = null) {
   const groups = [];
   const lows = [];
   let failures = 0;
@@ -629,6 +654,8 @@ async function fetchLiveSnapshot(previousIndices = []) {
     groups,
     lows,
     indices: previousIndices,
+    b3AsOf: previousSnapshot?.b3AsOf,
+    b3Closed: previousSnapshot?.b3Closed,
   };
 }
 
@@ -655,8 +682,9 @@ async function load({ manual = false, forceLive = false } = {}) {
     let live = false;
     if (!snapshot || forceLive || isSnapshotStale(snapshot)) {
       try {
-        const previousIndices = snapshot?.indices || lastSnapshot?.indices || [];
-        snapshot = await fetchLiveSnapshot(previousIndices);
+        const previous = snapshot || lastSnapshot;
+        const previousIndices = previous?.indices || [];
+        snapshot = await fetchLiveSnapshot(previousIndices, previous);
         live = true;
       } catch (error) {
         if (!snapshot) {

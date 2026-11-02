@@ -8,9 +8,9 @@ on:
   schedule:
     # B3 local time (America/Sao_Paulo). Minutes 5/35 avoid the top-of-the-hour
     # load window where GitHub is more likely to delay or drop scheduled runs.
-    - cron: "5,35 8-16 * * 1-5"
+    - cron: "5,35 10-17 * * 1-5"
       timezone: "America/Sao_Paulo"
-    - cron: "5 17 * * 1-5"
+    - cron: "5 18 * * 1-5"
       timezone: "America/Sao_Paulo"
   workflow_dispatch:
 

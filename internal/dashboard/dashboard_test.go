@@ -192,6 +192,83 @@ func TestBuilderIndexFailureIsNotFatal(t *testing.T) {
 	}
 }
 
+func TestBuilderDetectsB3Session(t *testing.T) {
+	t.Parallel()
+
+	generatedAt := time.Date(2026, 11, 2, 18, 0, 0, 0, time.UTC)
+	lastSession := time.Date(2026, 10, 30, 20, 18, 0, 0, time.UTC)
+	sessionDay := time.Date(2026, 11, 2, 17, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name       string
+		quotes     []marketindex.Quote
+		wantAsOf   time.Time
+		wantClosed bool
+	}{
+		{
+			name: "holiday repeats the last session",
+			quotes: []marketindex.Quote{
+				{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", AsOf: lastSession},
+				{Key: "sp500", Label: "S&P 500", Symbol: "^GSPC", AsOf: sessionDay},
+			},
+			wantAsOf:   lastSession,
+			wantClosed: true,
+		},
+		{
+			name: "session day",
+			quotes: []marketindex.Quote{
+				{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", AsOf: sessionDay},
+			},
+			wantAsOf:   sessionDay,
+			wantClosed: false,
+		},
+		{
+			name: "missing ibovespa",
+			quotes: []marketindex.Quote{
+				{Key: "sp500", Label: "S&P 500", Symbol: "^GSPC", AsOf: sessionDay},
+			},
+			wantClosed: false,
+		},
+		{
+			name: "ibovespa error",
+			quotes: []marketindex.Quote{
+				{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", Error: "yahoo unavailable"},
+			},
+			wantClosed: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			fetcher := fakeFetcher{assets: map[string][]brapi.Asset{
+				"stock/stock": {{Symbol: "PETR4", Close: 38.5, Change: 1.2}},
+			}}
+			builder, err := dashboard.NewBuilder(
+				fetcher,
+				dashboard.WithGroups([]brapi.Group{{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"}}),
+				dashboard.WithIndexFetcher(fakeIndexFetcher{quotes: test.quotes}),
+				dashboard.WithClock(func() time.Time { return generatedAt }),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder() error = %v", err)
+			}
+
+			snapshot, err := builder.Build(context.Background())
+			if err != nil {
+				t.Fatalf("Build() error = %v", err)
+			}
+			if !snapshot.B3AsOf.Equal(test.wantAsOf) {
+				t.Errorf("B3AsOf = %v, want %v", snapshot.B3AsOf, test.wantAsOf)
+			}
+			if snapshot.B3Closed != test.wantClosed {
+				t.Errorf("B3Closed = %v, want %v", snapshot.B3Closed, test.wantClosed)
+			}
+		})
+	}
+}
+
 func TestBuilderKeepsPartialResults(t *testing.T) {
 	t.Parallel()
 
