@@ -8,7 +8,7 @@
   <script>document.documentElement.classList.add("js");</script>
   <noscript><style>.reveal,.reveal-right{opacity:1 !important;transform:none !important}</style></noscript>
   <title>Altas e Baixas · stckcraw</title>
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -42,9 +42,27 @@
   </header>
 
   <section class="toolbar reveal" aria-label="Direção da variação">
-    <div class="mode-switch" role="tablist" aria-label="Altas ou baixas">
-      <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
-      <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
+    <div class="toolbar-start">
+      <div class="mode-switch" role="tablist" aria-label="Altas ou baixas">
+        <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
+        <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
+      </div>
+      <div class="asset-search" id="asset-search-root">
+        <button id="search-toggle" class="search-toggle" type="button"
+          aria-label="Buscar ativo" aria-expanded="false" aria-controls="search-panel">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div id="search-panel" class="search-panel">
+          <input id="asset-search" class="search-input" type="search" placeholder="Ticker ou nome — ex.: PETR4"
+            aria-label="Buscar ativo por ticker ou nome"
+            autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false"
+            aria-controls="search-results" aria-autocomplete="list">
+        </div>
+        <div id="search-results" class="search-results" role="listbox" aria-label="Resultados da busca" aria-live="polite" hidden></div>
+      </div>
     </div>
     <p id="mode-description" class="mode-description">Top 10 maiores altas do dia</p>
   </section>
@@ -66,6 +84,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

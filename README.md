@@ -13,6 +13,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
 - **Índices de mercado:** Ibovespa, S&P 500, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
+- **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
 - **Gráficos diários:** cada índice e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
@@ -42,6 +43,8 @@ flowchart LR
 ```
 
 O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices e em **lotes de até 20 símbolos** para o histórico dos ativos, usando `range=1mo&interval=1d`. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
+
+A busca consulta `GET /quote/list?search=...` na brapi. Para ativos fora do snapshot, o histórico do gráfico é carregado sob demanda pelo endpoint `/history` do Worker Cloudflare, que usa Yahoo Spark e cache de borda. Localmente, rode `cd cloudflare && npx wrangler dev --port 8787` junto com o site.
 
 O frontend usa o snapshot como cache: ele verifica a cada 5 minutos e, se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices e os mini gráficos dos ativos são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
 
@@ -272,6 +275,7 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 | Rate limit brapi | 20 req/min; usamos 12 por execução |
 | Fallback do navegador | consulta a brapi quando o snapshot tem mais de 35 min |
 | Fallback de índices | a Yahoo não expõe CORS; o navegador mantém os índices do último snapshot |
+| Busca | brapi `/quote/list?search=...`, sem token; histórico do ativo via Worker `/history` |
 | Yahoo `429` | o crawler usa o último snapshot bom do espelho Cloudflare, em vez de gravar `error` |
 
 ## Qualidade

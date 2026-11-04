@@ -18,6 +18,10 @@ export default {
       return snapshot();
     }
 
+    if (url.pathname === "/history") {
+      return history(url);
+    }
+
     if (url.pathname !== "/trigger" || request.method !== "POST") {
       return new Response("not found", { status: 404 });
     }
@@ -68,6 +72,100 @@ async function snapshot() {
       { status: 502, headers: { "access-control-allow-origin": "*" } },
     );
   }
+}
+
+async function history(url) {
+  const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,12}$/.test(symbol)) {
+    return jsonError("invalid symbol", 400);
+  }
+
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+  const cacheKey = new Request(`https://stckcraw-history/${symbol}`, { method: "GET" });
+  if (cache) {
+    try {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // Local runtimes may not implement the Cache API.
+    }
+  }
+
+  const target = new URL("https://query1.finance.yahoo.com/v7/finance/spark");
+  target.searchParams.set("symbols", `${symbol}.SA`);
+  target.searchParams.set("range", "1mo");
+  target.searchParams.set("interval", "1d");
+
+  let response;
+  try {
+    response = await fetch(target, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "stckcraw-cloudflare-history",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return jsonError(`history request failed: ${message}`, 502);
+  }
+
+  if (!response.ok) {
+    return jsonError(`history status ${response.status}`, 502);
+  }
+
+  const payload = await response.json().catch(() => null);
+  const result = payload?.spark?.result?.[0];
+  const series = result?.response?.[0];
+  const timestamps = Array.isArray(series?.timestamp) ? series.timestamp : [];
+  const closes = Array.isArray(series?.indicators?.quote?.[0]?.close)
+    ? series.indicators.quote[0].close
+    : [];
+  const points = [];
+  const count = Math.min(timestamps.length, closes.length);
+  for (let i = 0; i < count; i += 1) {
+    const close = closes[i];
+    const timestamp = timestamps[i];
+    if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
+      continue;
+    }
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      continue;
+    }
+    points.push({
+      date: new Date(timestamp * 1000).toISOString(),
+      close,
+    });
+  }
+
+  if (points.length === 0) {
+    return jsonError("history unavailable", 404);
+  }
+
+  const output = new Response(JSON.stringify({ symbol, points }), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": "*",
+      "cache-control": "public, max-age=300, stale-while-revalidate=600",
+    },
+  });
+
+  if (cache) {
+    try {
+      await cache.put(cacheKey, output.clone());
+    } catch {
+      // Local runtimes may not implement the Cache API.
+    }
+  }
+  return output;
+}
+
+function jsonError(message, status) {
+  return Response.json(
+    { error: message },
+    { status, headers: { "access-control-allow-origin": "*" } },
+  );
 }
 
 async function dispatch(env) {

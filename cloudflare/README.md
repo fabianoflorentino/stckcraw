@@ -13,6 +13,8 @@ flowchart LR
 
 O Worker **não gera dados**: ele apenas chama a API do GitHub para iniciar o workflow. O workflow continua sendo o responsável por consultar a brapi e publicar o Pages.
 
+Ele também expõe um proxy público de histórico (`/history?symbol=PETR4`) usado pela busca do site para carregar o gráfico de ativos fora do top 10. O endpoint consulta o Yahoo Spark, valida o ticker, adiciona `.SA` e usa cache de borda.
+
 ## Dois Workers, papéis diferentes
 
 | Worker | Papel | URL |
@@ -103,6 +105,18 @@ curl "http://localhost:8787/__scheduled?cron=5,35+13-20+*+*+2-6"
 
 `/health` responde `ok` e serve para verificar se o Worker está no ar.
 
+### Histórico sob demanda
+
+Com o Worker rodando localmente (`npx wrangler dev --port 8787`), teste:
+
+```bash
+curl "http://localhost:8787/history?symbol=PETR4"
+```
+
+Resposta: `{"symbol":"PETR4","points":[{"date":"...","close":50.71}, ...]}`.
+
+O site em `localhost:8080` usa automaticamente `http://localhost:8787/history`; no domínio de produção ele usa `https://stckcraw-dispatch.fabianoflorentino.workers.dev/history` (o Worker precisa ser deployado com essa rota).
+
 ## Segurança
 
 - O PAT deve ter o menor escopo possível: apenas este repositório e `Actions: write`.
@@ -110,7 +124,7 @@ curl "http://localhost:8787/__scheduled?cron=5,35+13-20+*+*+2-6"
 - Não coloque o PAT no `docs/app.js`, no repositório ou em variáveis públicas do `wrangler.toml`.
 - O endpoint `/trigger` exige `TRIGGER_SECRET`; sem o secret, ele responde `401`.
 - O botão **Atualizar** do site **não** chama esse endpoint: ele busca a brapi diretamente no navegador. O Worker existe para manter o snapshot estático atualizado.
-- O endpoint público expõe apenas `/health` e `/trigger`; qualquer outra rota responde `404`.
+- Os endpoints públicos são `/health`, `/snapshot`, `/history` e `/trigger`; `/trigger` exige `TRIGGER_SECRET`.
 
 ## Espelho estático no Cloudflare
 

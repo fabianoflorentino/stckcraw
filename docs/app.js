@@ -1,5 +1,11 @@
 const DATA_URL = "data/latest.json";
 const SNAPSHOT_FALLBACK_URL = "https://stckcraw-dispatch.fabianoflorentino.workers.dev/snapshot";
+const HISTORY_URL = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ? "http://localhost:8787/history"
+  : "https://stckcraw-dispatch.fabianoflorentino.workers.dev/history";
+const SEARCH_URL = "https://brapi.dev/api/quote/list";
+const SEARCH_TIMEOUT_MS = 350;
+const SEARCH_LIMIT = 12;
 const REFRESH_MS = 5 * 60 * 1000;
 const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
 
@@ -21,6 +27,10 @@ const backToTopEl = document.getElementById("back-to-top");
 const chartDialogEl = document.getElementById("index-chart");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
 const modeDescriptionEl = document.getElementById("mode-description");
+const assetSearchEl = document.querySelector(".asset-search");
+const searchToggleEl = document.getElementById("search-toggle");
+const searchInputEl = document.getElementById("asset-search");
+const searchResultsEl = document.getElementById("search-results");
 
 const MODES = {
   highs: {
@@ -62,6 +72,14 @@ let toastTimer = null;
 let activeMode = "highs";
 let activeChartKey = null;
 let lastChartTrigger = null;
+let chartCloseTimer = null;
+let chartCloseHandler = null;
+let chartClosing = false;
+let searchTimer = null;
+let searchController = null;
+let searchItems = [];
+let activeSearchIndex = -1;
+const searchCache = new Map();
 const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
 const COLLAPSED_KEY = "stckcraw:collapsed";
@@ -332,12 +350,26 @@ function renderChart(index) {
   head.append(titleWrap, closeButton);
   content.appendChild(head);
 
+  if (index.loading) {
+    const loading = document.createElement("p");
+    loading.className = "chart-empty chart-loading";
+    loading.textContent = "Carregando histórico diário…";
+    content.appendChild(loading);
+    chartDialogEl.replaceChildren(content);
+    if (hadFocus) {
+      chartDialogEl.querySelector(".chart-close")?.focus();
+    }
+    return;
+  }
+
   if (points.length < 2) {
     const empty = document.createElement("p");
     empty.className = "chart-empty";
     empty.textContent = index.error
       ? `Dados indisponíveis: ${index.error}`
-      : "Histórico diário indisponível para este item.";
+      : index.historyError
+        ? `Histórico indisponível: ${index.historyError}`
+        : "Histórico diário indisponível para este item.";
     content.appendChild(empty);
     chartDialogEl.replaceChildren(content);
     if (hadFocus) {
@@ -374,6 +406,53 @@ function renderChart(index) {
   }
 }
 
+function clearChartCloseAnimation() {
+  window.clearTimeout(chartCloseTimer);
+  chartCloseTimer = null;
+  if (chartCloseHandler) {
+    chartDialogEl.removeEventListener("transitionend", chartCloseHandler);
+    chartCloseHandler = null;
+  }
+}
+
+function showChartModal() {
+  if (!chartDialogEl) {
+    return;
+  }
+
+  clearChartCloseAnimation();
+  chartClosing = false;
+  chartDialogEl.classList.remove("closing");
+
+  if (chartDialogEl.open) {
+    chartDialogEl.classList.remove("opening");
+    return;
+  }
+
+  if (prefersReducedMotion) {
+    if (typeof chartDialogEl.showModal === "function") {
+      chartDialogEl.showModal();
+    } else {
+      chartDialogEl.setAttribute("open", "");
+    }
+    return;
+  }
+
+  chartDialogEl.classList.add("opening");
+  if (typeof chartDialogEl.showModal === "function") {
+    chartDialogEl.showModal();
+  } else {
+    chartDialogEl.setAttribute("open", "");
+  }
+
+  const reveal = () => chartDialogEl.classList.remove("opening");
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
+  } else {
+    window.setTimeout(reveal, 20);
+  }
+}
+
 function openChart(chart, trigger) {
   if (!chartDialogEl) {
     return;
@@ -382,26 +461,304 @@ function openChart(chart, trigger) {
   activeChartKey = chart.key || chart.symbol || "";
   lastChartTrigger = trigger || null;
   renderChart(chart);
-
-  if (typeof chartDialogEl.showModal === "function") {
-    if (!chartDialogEl.open) {
-      chartDialogEl.showModal();
-    }
-  } else {
-    chartDialogEl.setAttribute("open", "");
-  }
+  showChartModal();
 }
 
 function closeChart() {
-  if (!chartDialogEl?.open) {
+  if (!chartDialogEl?.open || chartClosing) {
     return;
   }
 
-  if (typeof chartDialogEl.close === "function") {
-    chartDialogEl.close();
-  } else {
-    chartDialogEl.removeAttribute("open");
+  clearChartCloseAnimation();
+  const finish = () => {
+    if (!chartClosing) {
+      return;
+    }
+    clearChartCloseAnimation();
+    chartClosing = false;
+    chartDialogEl.classList.remove("closing");
+    if (typeof chartDialogEl.close === "function") {
+      chartDialogEl.close();
+    } else {
+      chartDialogEl.removeAttribute("open");
+    }
+  };
+
+  chartClosing = true;
+
+  if (prefersReducedMotion) {
+    finish();
+    return;
   }
+
+  chartDialogEl.classList.add("closing");
+  chartCloseHandler = (event) => {
+    if (event.target === chartDialogEl && event.propertyName === "opacity") {
+      finish();
+    }
+  };
+  chartDialogEl.addEventListener("transitionend", chartCloseHandler);
+  chartCloseTimer = window.setTimeout(finish, 500);
+}
+
+function assetTypeLabel(asset) {
+  const type = String(asset.type || "").toLowerCase();
+  const subType = String(asset.subType || "").toLowerCase();
+  if (subType === "fii") return "FII";
+  if (subType === "fip") return "FIP";
+  if (subType === "etf") return "ETF";
+  if (subType === "unit") return "Unit";
+  if (type === "bdr") return "BDR";
+  if (type === "fund") return "Fundo";
+  return "Ação";
+}
+
+function searchResultItem(asset) {
+  const symbol = String(asset.stock || "").trim().toUpperCase();
+  return {
+    key: `asset:${symbol}`,
+    symbol,
+    name: String(asset.name || "").trim(),
+    price: Number(asset.close) || 0,
+    change: Number(asset.change) || 0,
+    type: assetTypeLabel(asset),
+    history: [],
+  };
+}
+
+function findSnapshotHistory(symbol) {
+  for (const groups of [lastSnapshot?.groups, lastSnapshot?.lows]) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const item = (group.items || []).find((entry) => entry.symbol === symbol);
+      if (item && Array.isArray(item.history) && item.history.length >= 2) {
+        return item.history;
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchAssetHistory(symbol) {
+  const response = await fetch(`${HISTORY_URL}?symbol=${encodeURIComponent(symbol)}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  if (!Array.isArray(payload.points)) {
+    throw new Error("resposta inesperada");
+  }
+  return payload.points;
+}
+
+async function openSearchAsset(item, trigger) {
+  const chart = {
+    key: item.key,
+    label: item.symbol,
+    symbol: item.name,
+    price: item.price,
+    change: item.change,
+    timezone: "America/Sao_Paulo",
+    history: findSnapshotHistory(item.symbol) || [],
+  };
+
+  if (chart.history.length >= 2) {
+    openChart(chart, trigger);
+    return;
+  }
+
+  activeChartKey = chart.key;
+  lastChartTrigger = trigger || null;
+  renderChart({ ...chart, loading: true });
+  showChartModal();
+
+  try {
+    const history = await fetchAssetHistory(item.symbol);
+    if (activeChartKey !== chart.key) {
+      return;
+    }
+    chart.history = history;
+    renderChart(chart);
+  } catch (error) {
+    if (activeChartKey === chart.key) {
+      renderChart({ ...chart, historyError: error.message });
+    }
+  }
+}
+
+function hideSearchResults() {
+  searchResultsEl.hidden = true;
+  searchInputEl.setAttribute("aria-expanded", "false");
+  searchInputEl.removeAttribute("aria-activedescendant");
+  activeSearchIndex = -1;
+}
+
+function showSearchResults() {
+  searchResultsEl.hidden = false;
+  searchInputEl.setAttribute("aria-expanded", "true");
+}
+
+function openSearch() {
+  if (!assetSearchEl) {
+    return;
+  }
+
+  assetSearchEl.classList.add("open");
+  searchToggleEl?.setAttribute("aria-expanded", "true");
+  window.setTimeout(() => searchInputEl?.focus(), 30);
+
+  if (searchItems.length > 0) {
+    showSearchResults();
+  } else if (searchInputEl?.value.trim().length >= 2) {
+    scheduleSearch(searchInputEl.value);
+  }
+}
+
+function closeSearch() {
+  assetSearchEl?.classList.remove("open");
+  searchToggleEl?.setAttribute("aria-expanded", "false");
+  hideSearchResults();
+}
+
+function setActiveSearchIndex(index) {
+  const options = Array.from(searchResultsEl.querySelectorAll(".search-result"));
+  activeSearchIndex = index;
+  options.forEach((option, position) => {
+    const active = position === index;
+    option.classList.toggle("active", active);
+    option.setAttribute("aria-selected", String(active));
+  });
+
+  if (index >= 0 && options[index]) {
+    searchInputEl.setAttribute("aria-activedescendant", options[index].id);
+    options[index].scrollIntoView({ block: "nearest" });
+  } else {
+    searchInputEl.removeAttribute("aria-activedescendant");
+  }
+}
+
+function showSearchMessage(message) {
+  searchItems = [];
+  activeSearchIndex = -1;
+  const empty = document.createElement("p");
+  empty.className = "search-empty";
+  empty.textContent = message;
+  searchResultsEl.replaceChildren(empty);
+  showSearchResults();
+}
+
+function renderSearchResults(items, query) {
+  searchItems = items;
+  activeSearchIndex = -1;
+  searchResultsEl.replaceChildren();
+
+  if (items.length === 0) {
+    showSearchMessage(`Nenhum ativo encontrado para “${query}”.`);
+    return;
+  }
+
+  items.forEach((item, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "search-result";
+    option.id = `search-option-${index}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.innerHTML = `
+      <span class="search-result-main">
+        <span class="search-result-symbol">${escapeHTML(item.symbol)}</span>
+        <span class="search-result-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
+        <span class="search-result-type">${escapeHTML(item.type)}</span>
+      </span>
+      <span class="search-result-side">
+        <strong class="search-result-price">${escapeHTML(formatMoney(item.price))}</strong>
+        <span class="search-result-change ${changeTone(item.change)}">${escapeHTML(formatPercent(item.change))}</span>
+      </span>`;
+    option.addEventListener("click", () => selectSearchResult(item));
+    searchResultsEl.appendChild(option);
+  });
+
+  showSearchResults();
+  searchInputEl.removeAttribute("aria-activedescendant");
+}
+
+async function runSearch(query) {
+  const cacheKey = query.toLowerCase();
+  const cached = searchCache.get(cacheKey);
+  if (cached) {
+    if (query.toLowerCase() === searchInputEl.value.trim().toLowerCase()) {
+      renderSearchResults(cached, query);
+    }
+    return;
+  }
+
+  if (typeof AbortController === "function") {
+    searchController?.abort();
+    searchController = new AbortController();
+  }
+  showSearchMessage("Buscando ativos…");
+
+  try {
+    const params = new URLSearchParams({
+      search: query,
+      limit: String(SEARCH_LIMIT),
+    });
+    const response = await fetch(`${SEARCH_URL}?${params}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: searchController?.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const assets = (Array.isArray(payload.stocks) ? payload.stocks : [])
+      .filter((asset) => !String(asset.stock || "").toUpperCase().endsWith("F"))
+      .slice(0, 8)
+      .map((asset) => searchResultItem(asset));
+
+    if (searchCache.size > 40) {
+      searchCache.delete(searchCache.keys().next().value);
+    }
+    searchCache.set(cacheKey, assets);
+
+    if (query.toLowerCase() !== searchInputEl.value.trim().toLowerCase()) {
+      return;
+    }
+    renderSearchResults(assets, query);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      return;
+    }
+    if (query.toLowerCase() === searchInputEl.value.trim().toLowerCase()) {
+      showSearchMessage(`Busca indisponível: ${error.message}`);
+    }
+  }
+}
+
+function scheduleSearch(rawQuery) {
+  const query = rawQuery.trim().replace(/\s+/g, " ");
+  window.clearTimeout(searchTimer);
+  searchController?.abort();
+
+  if (query.length < 2) {
+    searchItems = [];
+    hideSearchResults();
+    return;
+  }
+
+  searchTimer = window.setTimeout(() => {
+    void runSearch(query);
+  }, SEARCH_TIMEOUT_MS);
+}
+
+function selectSearchResult(item) {
+  hideSearchResults();
+  searchInputEl.blur();
+  void openSearchAsset(item, searchInputEl);
 }
 
 function relativeTime(value) {
@@ -1105,6 +1462,86 @@ refreshEl.addEventListener("click", () => {
   void load({ manual: true, forceLive: true });
 });
 
+if (searchInputEl) {
+  searchToggleEl?.addEventListener("click", () => {
+    if (assetSearchEl?.classList.contains("open")) {
+      closeSearch();
+      searchToggleEl.focus();
+      return;
+    }
+    openSearch();
+  });
+
+  searchInputEl.addEventListener("input", () => {
+    scheduleSearch(searchInputEl.value);
+  });
+
+  searchInputEl.addEventListener("focus", () => {
+    if (searchItems.length > 0) {
+      showSearchResults();
+    }
+  });
+
+  searchInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      if (searchItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      setActiveSearchIndex((activeSearchIndex + 1) % searchItems.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      if (searchItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      const previous = activeSearchIndex <= 0 ? searchItems.length - 1 : activeSearchIndex - 1;
+      setActiveSearchIndex(previous);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      if (searchItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      const index = activeSearchIndex >= 0 ? activeSearchIndex : 0;
+      selectSearchResult(searchItems[index]);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (!searchResultsEl.hidden) {
+        hideSearchResults();
+        return;
+      }
+      closeSearch();
+      searchToggleEl?.focus();
+    }
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!assetSearchEl?.contains(event.target)) {
+      closeSearch();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof HTMLElement
+      && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+    event.preventDefault();
+    openSearch();
+  });
+}
+
 for (const button of modeButtons) {
   button.addEventListener("click", () => {
     setMode(button.dataset.mode);
@@ -1116,6 +1553,11 @@ if (chartDialogEl) {
     if (event.target === chartDialogEl) {
       closeChart();
     }
+  });
+
+  chartDialogEl.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeChart();
   });
 
   chartDialogEl.addEventListener("close", () => {
