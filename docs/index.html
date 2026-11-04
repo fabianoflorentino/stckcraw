@@ -5,14 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, com gráficos diários dos índices e ativos, atualizado a cada 30 minutos.">
   <meta name="theme-color" content="#0b1120">
+  <script>document.documentElement.classList.add("js");</script>
+  <noscript><style>.reveal,.reveal-right{opacity:1 !important;transform:none !important}</style></noscript>
   <title>Altas e Baixas · stckcraw</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
 
   <header class="hero">
-    <div class="hero-copy">
+    <canvas id="market-particles" aria-hidden="true"></canvas>
+    <div class="hero-copy reveal">
       <div class="live"><span class="live-dot" aria-hidden="true"></span> dias úteis · 10h–18h · a cada 30 min</div>
       <h1>Altas <span>&</span> Baixas</h1>
       <p class="subtitle">Principais índices e top 10 da B3 por variação do dia — ações, FIIs, FIPs, ETFs, BDRs e units. Clique em um índice ou em qualquer parte da linha de um ativo para ver o histórico diário do último mês.</p>
@@ -22,7 +25,7 @@
       </p>
     </div>
 
-    <div class="hero-actions">
+    <div class="hero-actions reveal reveal-right">
       <p id="status" class="status" aria-live="polite">Carregando…</p>
       <div class="actions">
         <button id="refresh" class="button button-primary" type="button"
@@ -37,7 +40,7 @@
     </div>
   </header>
 
-  <section class="toolbar" aria-label="Direção da variação">
+  <section class="toolbar reveal" aria-label="Direção da variação">
     <div class="mode-switch" role="tablist" aria-label="Altas ou baixas">
       <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
       <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
@@ -45,9 +48,9 @@
     <p id="mode-description" class="mode-description">Top 10 maiores altas do dia</p>
   </section>
 
-  <section id="indices" class="indices" aria-label="Índices de mercado"></section>
-  <section id="highlights" class="highlights" aria-label="Destaques"></section>
-  <main id="groups" class="groups" aria-live="polite"></main>
+  <section id="indices" class="indices reveal" aria-label="Índices de mercado"></section>
+  <section id="highlights" class="highlights reveal" aria-label="Destaques"></section>
+  <main id="groups" class="groups reveal" aria-live="polite"></main>
 
   <footer class="footer">
     <span>Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a> + <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer">Yahoo Finance</a> · atualizações a cada 30 min em dias úteis (10h–18h)</span>
@@ -62,6 +65,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

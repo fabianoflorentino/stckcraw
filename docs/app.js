@@ -62,6 +62,7 @@ let toastTimer = null;
 let activeMode = "highs";
 let activeChartKey = null;
 let lastChartTrigger = null;
+const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
 const COLLAPSED_KEY = "stckcraw:collapsed";
 const collapsedGroups = loadCollapsedGroups();
@@ -1131,6 +1132,128 @@ if (chartDialogEl) {
   });
 }
 
+function initReveal() {
+  const elements = Array.from(document.querySelectorAll(".reveal, .reveal-right"));
+  if (prefersReducedMotion || !("IntersectionObserver" in window)) {
+    elements.forEach((element) => element.classList.add("visible"));
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) {
+        continue;
+      }
+      entry.target.classList.add("visible");
+      observer.unobserve(entry.target);
+    }
+  }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+
+  elements.forEach((element) => observer.observe(element));
+}
+
+function initMarketParticles() {
+  const canvas = document.getElementById("market-particles");
+  if (!canvas || prefersReducedMotion) {
+    return;
+  }
+
+  let context = null;
+  try {
+    context = canvas.getContext("2d");
+  } catch {
+    return;
+  }
+  if (!context) {
+    return;
+  }
+
+  const glyphs = "0123456789$%+-▲▼";
+  const particles = [];
+  let width = 0;
+  let height = 0;
+  let isVisible = true;
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+    }, { rootMargin: "80px" });
+    observer.observe(canvas);
+  }
+
+  function makeParticle(resetY = false) {
+    return {
+      x: Math.random() * width,
+      y: resetY ? -12 : Math.random() * height,
+      glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
+      speed: 0.25 + Math.random() * 0.6,
+      drift: (Math.random() - 0.5) * 0.12,
+      opacity: 0.04 + Math.random() * 0.1,
+      size: 9 + Math.floor(Math.random() * 5),
+      timer: 0,
+      interval: 70 + Math.floor(Math.random() * 160),
+      green: Math.random() > 0.82,
+    };
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = canvas.clientWidth;
+    height = canvas.clientHeight;
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    particles.length = 0;
+    const count = Math.min(58, Math.max(22, Math.round(width / 24)));
+    for (let i = 0; i < count; i += 1) {
+      particles.push(makeParticle());
+    }
+  }
+
+  function animate() {
+    window.requestAnimationFrame(animate);
+    if (document.hidden || !isVisible || width === 0) {
+      return;
+    }
+
+    context.clearRect(0, 0, width, height);
+    for (const particle of particles) {
+      particle.y += particle.speed;
+      particle.x += particle.drift;
+      particle.timer += 1;
+
+      if (particle.timer >= particle.interval) {
+        particle.glyph = glyphs[Math.floor(Math.random() * glyphs.length)];
+        particle.timer = 0;
+      }
+      if (particle.y > height + 12) {
+        particle.y = -12;
+        particle.x = Math.random() * width;
+      }
+      if (particle.x < -20) {
+        particle.x = width + 20;
+      } else if (particle.x > width + 20) {
+        particle.x = -20;
+      }
+
+      context.globalAlpha = particle.opacity;
+      context.fillStyle = particle.green ? "#3ddc97" : "#59a8ff";
+      context.font = `${particle.size}px "JetBrains Mono", monospace`;
+      context.fillText(particle.glyph, particle.x, particle.y);
+    }
+    context.globalAlpha = 1;
+  }
+
+  if (typeof window.requestAnimationFrame !== "function") {
+    return;
+  }
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  window.requestAnimationFrame(animate);
+}
+
 function updateBackToTop() {
   const visible = window.scrollY > 500;
   backToTopEl.classList.toggle("show", visible);
@@ -1161,4 +1284,6 @@ window.setInterval(() => {
   }
 }, 60_000);
 
+initReveal();
+initMarketParticles();
 void load();
