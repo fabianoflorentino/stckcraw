@@ -112,13 +112,25 @@ a:hover {
 }
 
 #market-particles {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.75;
+  opacity: 0.55;
+}
+
+#market-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.78;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 10%, #000 88%, transparent 100%);
 }
 
 .hero::after {
@@ -645,12 +657,21 @@ h1 span {
 
 .chart-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin: 18px 0 14px;
 }
 
+.chart-stat:nth-child(-n + 3) {
+  grid-column: span 2;
+}
+
+.chart-stat:nth-child(n + 4) {
+  grid-column: span 3;
+}
+
 .chart-stat {
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid rgba(35, 50, 82, 0.8);
   border-radius: 12px;
@@ -1371,6 +1392,10 @@ body:has(.chart-dialog[open]) {
     display: none;
   }
 
+  #market-backdrop {
+    opacity: 0.4;
+  }
+
   .hero {
     padding: 30px 16px 18px;
   }
@@ -1447,6 +1472,14 @@ body:has(.chart-dialog[open]) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .chart-stat:nth-child(n) {
+    grid-column: auto;
+  }
+
+  .chart-stat:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
   .chart-axis-label {
     font-size: 16px;
   }
@@ -1457,7 +1490,8 @@ body:has(.chart-dialog[open]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #market-particles {
+  #market-particles,
+  #market-backdrop {
     display: none;
   }
 

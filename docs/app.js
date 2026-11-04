@@ -348,13 +348,15 @@ function renderChart(index) {
 
   const change = periodChange(points);
   const lastPoint = points[points.length - 1];
+  const closes = points.map((point) => point.close);
   const summary = document.createElement("div");
   summary.className = "chart-summary";
   summary.append(
     chartStat("Último", formatPoints(index.price)),
     chartStat("Variação do dia", formatPercent(index.change), changeTone(index.change)),
     chartStat("No período", formatPercent(change), changeTone(change)),
-    chartStat("Mín / Máx", `${formatPoints(Math.min(...points.map((point) => point.close)))} / ${formatPoints(Math.max(...points.map((point) => point.close)))}`),
+    chartStat("Mínimo", formatPoints(Math.min(...closes))),
+    chartStat("Máximo", formatPoints(Math.max(...closes))),
   );
 
   const canvas = document.createElement("div");
@@ -1254,6 +1256,233 @@ function initMarketParticles() {
   window.requestAnimationFrame(animate);
 }
 
+function initMarketBackdrop() {
+  const canvas = document.getElementById("market-backdrop");
+  if (!canvas || prefersReducedMotion || typeof window.requestAnimationFrame !== "function") {
+    return;
+  }
+
+  let context = null;
+  try {
+    context = canvas.getContext("2d");
+  } catch {
+    return;
+  }
+  if (!context) {
+    return;
+  }
+
+  const step = 18;
+  const candleStep = 24;
+  let width = 0;
+  let height = 0;
+  let layers = [];
+  let candles = null;
+
+  function nextValue(previous, volatility = 0.55) {
+    return Math.max(-1.35, Math.min(1.35, previous + (Math.random() - 0.5) * volatility));
+  }
+
+  function makeSeries(length) {
+    let value = 0;
+    const values = [];
+    for (let i = 0; i < length; i += 1) {
+      value = nextValue(value);
+      values.push(value);
+    }
+    return values;
+  }
+
+  function makeChart(index) {
+    const colors = ["89, 168, 255", "61, 220, 151", "89, 168, 255", "139, 92, 246"];
+    const labels = ["IBOV", "S&P 500", "STOXX 50", "SSE"];
+    return {
+      baseY: height * (0.2 + index * 0.18),
+      amplitude: Math.min(54, height * 0.075),
+      offset: Math.random() * step,
+      speed: 0.12 + index * 0.035,
+      color: colors[index % colors.length],
+      label: labels[index % labels.length],
+      alpha: 0.075,
+      values: makeSeries(Math.ceil(width / step) + 4),
+    };
+  }
+
+  function makeCandle(previous = 0) {
+    const open = previous;
+    const close = nextValue(open, 0.7);
+    return {
+      open,
+      close,
+      high: Math.max(open, close) + Math.random() * 0.35,
+      low: Math.min(open, close) - Math.random() * 0.35,
+    };
+  }
+
+  function makeCandles() {
+    if (width < 700) {
+      return null;
+    }
+
+    let previous = 0;
+    const values = [];
+    const count = Math.ceil(width / candleStep) + 4;
+    for (let i = 0; i < count; i += 1) {
+      const candle = makeCandle(previous);
+      previous = candle.close;
+      values.push(candle);
+    }
+    return {
+      baseY: height * 0.84,
+      amplitude: Math.min(52, height * 0.065),
+      offset: 0,
+      speed: 0.18,
+      values,
+    };
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = canvas.clientWidth;
+    height = canvas.clientHeight;
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const chartCount = width < 700 ? 2 : 4;
+    layers = [];
+    for (let i = 0; i < chartCount; i += 1) {
+      layers.push(makeChart(i));
+    }
+    candles = makeCandles();
+  }
+
+  function drawGrid() {
+    const gap = width < 700 ? 48 : 72;
+    context.beginPath();
+    for (let x = 0; x <= width; x += gap) {
+      context.moveTo(x, 0);
+      context.lineTo(x, height);
+    }
+    for (let y = 0; y <= height; y += gap) {
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+    }
+    context.lineWidth = 1;
+    context.strokeStyle = "rgba(143, 162, 194, 0.03)";
+    context.stroke();
+  }
+
+  function drawChart(layer) {
+    layer.offset += layer.speed;
+    while (layer.offset >= step) {
+      layer.offset -= step;
+      layer.values.shift();
+      layer.values.push(nextValue(layer.values[layer.values.length - 1]));
+    }
+
+    const startX = -layer.offset;
+    const bottom = layer.baseY + layer.amplitude;
+    const points = layer.values.map((value, index) => ({
+      x: startX + index * step,
+      y: layer.baseY - value * layer.amplitude,
+    }));
+
+    context.beginPath();
+    for (let i = 0; i < points.length; i += 1) {
+      if (i === 0) {
+        context.moveTo(points[i].x, points[i].y);
+      } else {
+        context.lineTo(points[i].x, points[i].y);
+      }
+    }
+    context.lineWidth = 1;
+    context.strokeStyle = `rgba(${layer.color}, ${layer.alpha})`;
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(points[0].x, bottom);
+    for (const point of points) {
+      context.lineTo(point.x, point.y);
+    }
+    context.lineTo(points[points.length - 1].x, bottom);
+    context.closePath();
+    context.fillStyle = `rgba(${layer.color}, 0.018)`;
+    context.fill();
+
+    context.beginPath();
+    const last = points[points.length - 1];
+    context.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
+    context.fillStyle = `rgba(${layer.color}, 0.16)`;
+    context.fill();
+
+    context.fillStyle = `rgba(${layer.color}, 0.09)`;
+    context.font = '9px "JetBrains Mono", monospace';
+    context.fillText(layer.label, 18, layer.baseY - layer.amplitude - 8);
+  }
+
+  function drawCandles() {
+    if (!candles) {
+      return;
+    }
+
+    candles.offset += candles.speed;
+    while (candles.offset >= candleStep) {
+      candles.offset -= candleStep;
+      candles.values.shift();
+      candles.values.push(makeCandle(candles.values[candles.values.length - 1].close));
+    }
+
+    const startX = -candles.offset;
+    const bodyWidth = 6;
+
+    for (let i = 0; i < candles.values.length; i += 1) {
+      const candle = candles.values[i];
+      const x = startX + i * candleStep;
+      if (x < -candleStep || x > width + candleStep) {
+        continue;
+      }
+
+      const openY = candles.baseY - candle.open * candles.amplitude;
+      const closeY = candles.baseY - candle.close * candles.amplitude;
+      const highY = candles.baseY - candle.high * candles.amplitude;
+      const lowY = candles.baseY - candle.low * candles.amplitude;
+      const rgb = candle.close >= candle.open ? "61, 220, 151" : "255, 107, 107";
+
+      context.beginPath();
+      context.moveTo(x, highY);
+      context.lineTo(x, lowY);
+      context.lineWidth = 1;
+      context.strokeStyle = `rgba(${rgb}, 0.085)`;
+      context.stroke();
+
+      const top = Math.min(openY, closeY);
+      const bodyHeight = Math.max(2, Math.abs(closeY - openY));
+      context.fillStyle = `rgba(${rgb}, 0.055)`;
+      context.fillRect(x - bodyWidth / 2, top, bodyWidth, bodyHeight);
+    }
+
+  }
+
+  function animate() {
+    window.requestAnimationFrame(animate);
+    if (document.hidden || width === 0) {
+      return;
+    }
+
+    context.clearRect(0, 0, width, height);
+    drawGrid();
+    for (const layer of layers) {
+      drawChart(layer);
+    }
+    drawCandles();
+  }
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  window.requestAnimationFrame(animate);
+}
+
 function updateBackToTop() {
   const visible = window.scrollY > 500;
   backToTopEl.classList.toggle("show", visible);
@@ -1286,4 +1515,5 @@ window.setInterval(() => {
 
 initReveal();
 initMarketParticles();
+initMarketBackdrop();
 void load();
