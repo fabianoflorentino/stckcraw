@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,16 +31,22 @@ type IndexFetcher interface {
 	FetchAll(ctx context.Context, definitions []marketindex.Definition) ([]marketindex.Quote, error)
 }
 
+// HistoryFetcher fetches daily closes for the B3 assets in the dashboard.
+type HistoryFetcher interface {
+	FetchHistories(ctx context.Context, symbols []string) (map[string][]marketindex.HistoryPoint, error)
+}
+
 // Item is one row in a dashboard group.
 type Item struct {
-	Rank            int      `json:"rank"`
-	Symbol          string   `json:"symbol"`
-	Name            string   `json:"name"`
-	Price           float64  `json:"price"`
-	Change          float64  `json:"change"`
-	FinancialVolume float64  `json:"financialVolume"`
-	MarketCap       *float64 `json:"marketCap,omitempty"`
-	Sector          string   `json:"sector,omitempty"`
+	Rank            int                        `json:"rank"`
+	Symbol          string                     `json:"symbol"`
+	Name            string                     `json:"name"`
+	Price           float64                    `json:"price"`
+	Change          float64                    `json:"change"`
+	FinancialVolume float64                    `json:"financialVolume"`
+	MarketCap       *float64                   `json:"marketCap,omitempty"`
+	Sector          string                     `json:"sector,omitempty"`
+	History         []marketindex.HistoryPoint `json:"history,omitempty"`
 }
 
 // Group is one dashboard section.
@@ -67,12 +74,13 @@ type Snapshot struct {
 
 // Builder assembles a Snapshot from a TopFetcher.
 type Builder struct {
-	fetcher      TopFetcher
-	indexFetcher IndexFetcher
-	groups       []brapi.Group
-	indices      []marketindex.Definition
-	limit        int
-	now          func() time.Time
+	fetcher        TopFetcher
+	indexFetcher   IndexFetcher
+	historyFetcher HistoryFetcher
+	groups         []brapi.Group
+	indices        []marketindex.Definition
+	limit          int
+	now            func() time.Time
 }
 
 // Option configures a Builder.
@@ -96,6 +104,17 @@ func WithIndexFetcher(fetcher IndexFetcher) Option {
 			return errors.New("index fetcher must not be nil")
 		}
 		b.indexFetcher = fetcher
+		return nil
+	}
+}
+
+// WithHistoryFetcher sets the optional source of B3 asset histories.
+func WithHistoryFetcher(fetcher HistoryFetcher) Option {
+	return func(b *Builder) error {
+		if fetcher == nil {
+			return errors.New("history fetcher must not be nil")
+		}
+		b.historyFetcher = fetcher
 		return nil
 	}
 }
@@ -218,6 +237,12 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 		return snapshot, fmt.Errorf("all dashboard groups failed: %w", errors.Join(failures...))
 	}
 
+	if b.historyFetcher != nil {
+		if err := b.attachHistories(ctx, &snapshot); err != nil {
+			return snapshot, err
+		}
+	}
+
 	if b.indexFetcher != nil {
 		indices, err := b.indexFetcher.FetchAll(ctx, b.indices)
 		if err != nil {
@@ -228,6 +253,57 @@ func (b *Builder) Build(ctx context.Context) (Snapshot, error) {
 	}
 
 	return snapshot, nil
+}
+
+func (b *Builder) attachHistories(ctx context.Context, snapshot *Snapshot) error {
+	symbols := uniqueSymbols(snapshot.Groups, snapshot.Lows)
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	histories, err := b.historyFetcher.FetchHistories(ctx, symbols)
+	if err != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	for i := range snapshot.Groups {
+		attachGroupHistories(snapshot.Groups[i].Items, histories)
+	}
+	for i := range snapshot.Lows {
+		attachGroupHistories(snapshot.Lows[i].Items, histories)
+	}
+
+	return nil
+}
+
+func uniqueSymbols(groups ...[]Group) []string {
+	seen := make(map[string]struct{})
+	var symbols []string
+	for _, groupList := range groups {
+		for _, group := range groupList {
+			for _, item := range group.Items {
+				symbol := strings.ToUpper(strings.TrimSpace(item.Symbol))
+				if symbol == "" {
+					continue
+				}
+				if _, ok := seen[symbol]; ok {
+					continue
+				}
+				seen[symbol] = struct{}{}
+				symbols = append(symbols, symbol)
+			}
+		}
+	}
+
+	slices.Sort(symbols)
+	return symbols
+}
+
+func attachGroupHistories(items []Item, histories map[string][]marketindex.HistoryPoint) {
+	for i := range items {
+		symbol := strings.ToUpper(strings.TrimSpace(items[i].Symbol))
+		items[i].History = histories[symbol]
+	}
 }
 
 // b3Session returns the last B3 session timestamp and whether it falls on an

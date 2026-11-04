@@ -13,6 +13,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
 - **Índices de mercado:** Ibovespa, S&P 500, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
+- **Gráficos diários:** cada índice e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
@@ -40,9 +41,9 @@ flowchart LR
   user -.->|snapshot velho| brapi
 ```
 
-O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
+O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices e em **lotes de até 20 símbolos** para o histórico dos ativos, usando `range=1mo&interval=1d`. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
 
-O frontend usa o snapshot como cache: ele verifica a cada 5 minutos e, se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
+O frontend usa o snapshot como cache: ele verifica a cada 5 minutos e, se o `latest.json` tiver mais de 35 minutos (ou o scheduler falhar), ele mesmo consulta a brapi e monta o mesmo contrato no navegador. Como a Yahoo não libera CORS, nesse fallback os índices e os mini gráficos dos ativos são mantidos do último snapshot — cada card mostra o horário da última cotação. O botão **Atualizar** força a consulta direta à brapi.
 
 Quando o `asOf` do Ibovespa é de um dia anterior ao `generatedAt`, o status mostra **“B3 fechada · último pregão dd/mm/aaaa”**. Isso cobre fins de semana e feriados sem manter um calendário fixo; os índices de mercados que abriram continuam sendo atualizados.
 
@@ -59,7 +60,7 @@ Resumo dos pacotes:
 | `cmd/stckcraw` | entrada do binário e cancelamento por sinal |
 | `internal/cli` | flags, exit codes, modos CSV/dashboard |
 | `internal/brapi` | client HTTP do brapi.dev e catálogo de grupos |
-| `internal/marketindex` | client Yahoo Finance dos índices de mercado |
+| `internal/marketindex` | client Yahoo Finance dos índices e do histórico diário |
 | `internal/dashboard` | monta o snapshot normalizado e grava o JSON |
 | `internal/marketdata` | fonte InfoMoney/XP e variantes de filtro |
 | `internal/crawler` | orquestração concorrente das variantes CSV |
@@ -195,6 +196,8 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
   "generatedAt": "2026-10-28T21:41:09Z",
   "source": "brapi.dev",
   "limit": 10,
+  "b3AsOf": "2026-10-28T17:22:00Z",
+  "b3Closed": false,
   "indices": [
     {
       "key": "ibovespa",
@@ -204,7 +207,11 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
       "change": -1.12,
       "currency": "BRL",
       "timezone": "America/Sao_Paulo",
-      "asOf": "2026-10-29T17:22:00Z"
+      "asOf": "2026-10-28T17:22:00Z",
+      "history": [
+        { "date": "2026-10-27T13:00:00Z", "close": 171006.1 },
+        { "date": "2026-10-28T13:00:00Z", "close": 169081.88 }
+      ]
     }
   ],
   "groups": [
@@ -220,7 +227,11 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
           "change": 21.84,
           "financialVolume": 753,
           "marketCap": 2097277,
-          "sector": "Miscellaneous"
+          "sector": "Miscellaneous",
+          "history": [
+            { "date": "2026-10-27T13:00:00Z", "close": 2.4 },
+            { "date": "2026-10-28T13:00:00Z", "close": 2.51 }
+          ]
         }
       ]
     }
@@ -239,6 +250,8 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 - `lows` contém as maiores baixas.
 - `error` aparece no grupo quando aquela consulta falha.
 - `financialVolume` é aproximado por `preço × quantidade`, pois a brapi devolve quantidade.
+- `b3AsOf`/`b3Closed` indicam o último pregão da B3 e se ele é anterior ao dia do snapshot.
+- `indices[].history` e `groups[].items[].history` contêm os fechamentos diários do último mês, em ordem cronológica, usados no mini gráfico e na janela expandida.
 
 ## Dados e limitações
 
@@ -248,11 +261,14 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 | Cobertura | B3: Ações, FIIs, FIPs, ETFs, BDRs e Units |
 | Índices | Ibovespa (`^BVSP`), S&P 500 (`^GSPC`), Euro Stoxx 50 (`^STOXX50E`) e Shanghai (`000001.SS`) |
 | Horário dos índices | cada card mostra a última cotação no fuso da bolsa |
+| Gráficos | fechamentos diários de 1 mês para índices e ativos, em SVG nativo e sem biblioteca externa |
+| Histórico dos ativos | Yahoo Spark em lotes de até 20 símbolos `.SA`; ativos sem série ficam sem gráfico |
+| Preço vs. gráfico | preço/variação da tabela vêm da brapi; os fechamentos do gráfico vêm da Yahoo, então pequenas diferenças são esperadas |
 | Ordenação | variação percentual do dia |
 | Volume | aproximado (`preço × quantidade`) |
 | Nasdaq/NYSE | não implementados |
 | Tickers fracionários | descartados |
-| Feriados B3 | o workflow roda mesmo assim e repete o último snapshot |
+| Feriados B3 | o workflow roda, marca `b3Closed` e mantém o último pregão da B3; os índices abertos seguem atualizando |
 | Rate limit brapi | 20 req/min; usamos 12 por execução |
 | Fallback do navegador | consulta a brapi quando o snapshot tem mais de 35 min |
 | Fallback de índices | a Yahoo não expõe CORS; o navegador mantém os índices do último snapshot |

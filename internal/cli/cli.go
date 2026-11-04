@@ -166,17 +166,15 @@ func parse(args []string, stderr io.Writer) (options, error) {
 			return options{}, usageError{errors.New("brapi base URL must include a host")}
 		}
 
-		if !*noIndices {
-			parsed, err := url.Parse(*yahooBaseURL)
-			if err != nil {
-				return options{}, usageError{fmt.Errorf("parse Yahoo base URL: %w", err)}
-			}
-			if parsed.Scheme != "http" && parsed.Scheme != "https" {
-				return options{}, usageError{fmt.Errorf("yahoo base URL scheme must be http or https, got %q", parsed.Scheme)}
-			}
-			if parsed.Host == "" {
-				return options{}, usageError{errors.New("yahoo base URL must include a host")}
-			}
+		parsed, err = url.Parse(*yahooBaseURL)
+		if err != nil {
+			return options{}, usageError{fmt.Errorf("parse Yahoo base URL: %w", err)}
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return options{}, usageError{fmt.Errorf("yahoo base URL scheme must be http or https, got %q", parsed.Scheme)}
+		}
+		if parsed.Host == "" {
+			return options{}, usageError{errors.New("yahoo base URL must include a host")}
 		}
 
 		return options{
@@ -325,26 +323,27 @@ func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) e
 	}
 
 	builderOpts := []dashboard.Option{dashboard.WithLimit(opts.dashboardLimit)}
+	indexOpts := []marketindex.Option{
+		marketindex.WithBaseURL(opts.yahooBaseURL),
+		marketindex.WithHTTPClient(&http.Client{Timeout: opts.requestTimeout}),
+	}
+
+	if !opts.noIndices && opts.indicesFallbackURL != "" {
+		fallbackClient := &http.Client{Timeout: 5 * time.Second}
+		fallbackQuotes, fallbackErr := marketindex.FetchSnapshotIndices(ctx, fallbackClient, opts.indicesFallbackURL)
+		if fallbackErr == nil && len(fallbackQuotes) > 0 {
+			indexOpts = append(indexOpts, marketindex.WithFallback(fallbackQuotes))
+		} else if fallbackErr != nil {
+			writeFormat(stderr, "warn fallback de índices indisponível: %v\n", fallbackErr)
+		}
+	}
+
+	indexClient, indexErr := marketindex.NewClient(indexOpts...)
+	if indexErr != nil {
+		return fmt.Errorf("create market index client: %w", indexErr)
+	}
+	builderOpts = append(builderOpts, dashboard.WithHistoryFetcher(indexClient))
 	if !opts.noIndices {
-		indexOpts := []marketindex.Option{
-			marketindex.WithBaseURL(opts.yahooBaseURL),
-			marketindex.WithHTTPClient(&http.Client{Timeout: opts.requestTimeout}),
-		}
-
-		if opts.indicesFallbackURL != "" {
-			fallbackClient := &http.Client{Timeout: 5 * time.Second}
-			fallbackQuotes, fallbackErr := marketindex.FetchSnapshotIndices(ctx, fallbackClient, opts.indicesFallbackURL)
-			if fallbackErr == nil && len(fallbackQuotes) > 0 {
-				indexOpts = append(indexOpts, marketindex.WithFallback(fallbackQuotes))
-			} else if fallbackErr != nil {
-				writeFormat(stderr, "warn fallback de índices indisponível: %v\n", fallbackErr)
-			}
-		}
-
-		indexClient, indexErr := marketindex.NewClient(indexOpts...)
-		if indexErr != nil {
-			return fmt.Errorf("create market index client: %w", indexErr)
-		}
 		builderOpts = append(builderOpts, dashboard.WithIndexFetcher(indexClient))
 	}
 

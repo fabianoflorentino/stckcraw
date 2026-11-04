@@ -21,12 +21,12 @@ flowchart LR
   pages --> data["docs/data/latest.json"]
   actions["GitHub Actions"] --> crawler["stckcraw -dashboard"]
   crawler -->|12 requisições| brapi["brapi.dev"]
-  crawler -->|4 requisições| yahoo["Yahoo Finance"]
+  crawler -->|4 + até 6 lotes| yahoo["Yahoo Finance"]
   crawler --> data
   actions -->|artifact docs/| pages
   local["Docker Compose"] --> localCrawler["dashboard container"]
   localCrawler -->|12 requisições| brapi
-  localCrawler -->|4 requisições| yahoo
+  localCrawler -->|4 + até 6 lotes| yahoo
   localCrawler --> volume[("dashboard-data")]
   localWeb["web container"] --> volume
   localWeb --> browser["Navegador local"]
@@ -39,7 +39,7 @@ flowchart LR
 | `cmd/stckcraw` | entrypoint | cria o contexto com `signal.NotifyContext` e chama a CLI |
 | `internal/cli` | interface | flags, validação, exit codes e seleção de modo |
 | `internal/brapi` | adapter | client do `/quote/list`, grupos e `sortOrder` |
-| `internal/marketindex` | adapter | client Yahoo Finance dos índices |
+| `internal/marketindex` | adapter | client Yahoo Finance dos índices e do histórico diário |
 | `internal/dashboard` | use case | consulta altas/baixas, normaliza itens e grava o snapshot |
 | `internal/marketdata` | adapter legado | descoberta da config, client XP e variantes de filtro |
 | `internal/crawler` | use case legado | orquestra as variantes CSV com concorrência limitada |
@@ -77,8 +77,10 @@ flowchart TD
   mode -->|sim| yahoo["Yahoo Finance"]
   brapi --> groups["6 grupos x altas/baixas"]
   yahoo --> indices["4 índices de mercado"]
+  yahoo --> histories["histórico dos ativos (lotes de 20)"]
   groups --> normalize["Filtra fracionários e normaliza"]
   indices --> json["docs/data/latest.json"]
+  histories --> normalize
   normalize --> json
 ```
 
@@ -103,6 +105,8 @@ sequenceDiagram
   end
   C->>Y: GET /v8/finance/chart (4 índices)
   Y-->>C: Ibovespa, S&P 500, Euro Stoxx 50, Shanghai
+  C->>Y: GET /v7/finance/spark (lotes de até 20 ativos)
+  Y-->>C: fechamentos diários dos ativos
   C->>C: filtra fracionários e calcula volume
   C-->>R: docs/data/latest.json
   R->>P: upload artifact + deploy
@@ -156,7 +160,7 @@ sequenceDiagram
     U->>B: GET /quote/list (6 tipos x 2 direções)
     B-->>U: JSON de altas e baixas
     U->>U: filtra fracionários e monta o contrato
-    Note over U: índices continuam vindo do último snapshot
+    Note over U: índices e históricos continuam vindo do último snapshot
   end
   U->>U: renderiza cards de índices e abas Altas/Baixas
 ```
@@ -203,7 +207,11 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
       "change": -1.12,
       "currency": "BRL",
       "timezone": "America/Sao_Paulo",
-      "asOf": "2026-10-28T17:22:00Z"
+      "asOf": "2026-10-28T17:22:00Z",
+      "history": [
+        { "date": "2026-10-27T13:00:00Z", "close": 171006.1 },
+        { "date": "2026-10-28T13:00:00Z", "close": 169081.88 }
+      ]
     }
   ],
   "groups": [
@@ -219,7 +227,11 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
           "change": 21.84,
           "financialVolume": 753,
           "marketCap": 2097277,
-          "sector": "Miscellaneous"
+          "sector": "Miscellaneous",
+          "history": [
+            { "date": "2026-10-27T13:00:00Z", "close": 2.4 },
+            { "date": "2026-10-28T13:00:00Z", "close": 2.51 }
+          ]
         }
       ]
     }
@@ -240,9 +252,11 @@ O frontend prefere este contrato, venha ele do snapshot gerado pelo Go ou do fal
 | `rank` | calculado | 1..limit após filtro de fracionários |
 | `error` | calculado | presente apenas quando o grupo falha |
 | `indices[].price` | `regularMarketPrice` | último valor do índice |
-| `indices[].change` | `price / chartPreviousClose` | variação percentual |
+| `indices[].change` | `regularMarketChangePercent`; fallback pelos dois últimos fechamentos | variação percentual do dia |
 | `indices[].asOf` | `regularMarketTime` | horário UTC da última cotação |
 | `indices[].timezone` | `exchangeTimezoneName` | fuso usado no card |
+| `indices[].history` | `timestamp` + `indicators.quote[].close` | fechamentos diários dos últimos 30 dias, em ordem cronológica |
+| `groups[].items[].history` | Spark `response[].timestamp` + `close` | fechamentos diários do ativo; ausente quando a Yahoo não tem a série |
 | `b3AsOf` | `indices[ibovespa].asOf` | horário UTC do último pregão da B3 |
 | `b3Closed` | calculado | `true` quando o último pregão é de um dia UTC anterior ao `generatedAt` |
 
@@ -270,13 +284,18 @@ flowchart TD
 | snapshot velho/ausente | navegador consulta a brapi diretamente |
 | Yahoo falha em um índice | usa o último valor bom do snapshot de fallback; sem fallback, card com `error` |
 | Yahoo `429` em todos os índices | crawler preserva o último snapshot bom do espelho, em vez de sobrescrever com erros |
+| Yahoo falha no histórico dos ativos | lotes com sucesso continuam no snapshot; ativos sem série ficam sem sparkline, mas o dashboard é publicado |
 | B3 fechada (fim de semana/feriado) | `b3Closed=true`; o site mantém o último pregão e mostra o aviso, enquanto os índices que operaram são atualizados |
 
 ## 11. Decisões
 
 ### Por que Yahoo para os índices?
 
-A API de chart da Yahoo entrega os quatro índices com uma única chamada por símbolo, sem autenticação, e inclui o horário e o fuso da última cotação. A desvantagem é que ela não envia CORS: o fallback do navegador não consegue atualizá-la, então os cards de índice usam o último snapshot gerado pelo Go. Como o Worker da Cloudflare mantém o snapshot fresco a cada 30 min, isso é suficiente para o painel.
+A API de chart da Yahoo entrega os quatro índices com uma única chamada por símbolo, sem autenticação, e inclui o horário, o fuso e os fechamentos diários do último mês. O frontend desenha esses pontos em SVG, sem biblioteca externa: o card mostra uma sparkline e o clique abre a janela com o gráfico completo. A desvantagem é que a Yahoo não envia CORS: o fallback do navegador não consegue atualizá-la, então os cards de índice usam o último snapshot gerado pelo Go. Como o Worker da Cloudflare mantém o snapshot fresco a cada 30 min, isso é suficiente para o painel.
+
+### Por que Yahoo Spark para os ativos?
+
+O endpoint `/v7/finance/spark` devolve os fechamentos diários de vários símbolos em uma chamada. A Yahoo aceita até 20 símbolos por request, então os ~120 ativos únicos de altas+baixas viram 6 requests por execução, sem token. O sufixo `.SA` mapeia o ticker B3; quando a Yahoo não reconhece o ativo, ele simplesmente fica sem histórico. O endpoint brapi `/quote/{ticker}` também tem histórico, mas exige token e retornou `401` sem autenticação neste projeto.
 
 ### Por que brapi no dashboard?
 
@@ -306,7 +325,9 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - A variação é a do dia; não há variação de 30 minutos.
 - O volume é aproximado.
 - Os índices vêm da Yahoo Finance (não oficial) e usam o último valor disponível de cada bolsa; sessões e feriados são diferentes entre B3, EUA, Europa e China.
-- O navegador não atualiza os índices no fallback porque a Yahoo não libera CORS.
+- O navegador não atualiza os índices no fallback porque a Yahoo não libera CORS; o histórico dos ativos é reaproveitado do snapshot anterior.
+- Ativos sem série diária na Yahoo ficam sem sparkline/gráfico; o restante do dashboard continua normal.
+- O preço e a variação da tabela vêm da brapi; o histórico do gráfico vem da Yahoo, então pode haver pequenas diferenças de fechamento/ajuste.
 - Feriados da B3 são detectados pelo `b3AsOf` do Ibovespa: o site mantém o último pregão e mostra o aviso, mas o workflow continua rodando para atualizar os índices que abriram.
 - O scheduler do GitHub é best effort; um gatilho externo via `workflow_dispatch` é o fallback.
 

@@ -146,15 +146,31 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	defer server.Close()
 
 	indexServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.URL.Path, "/v8/finance/chart/") {
-			t.Errorf("index path = %q", r.URL.Path)
-		}
 		w.Header().Set("Content-Type", "application/json")
-		if _, err := fmt.Fprint(w, `{"chart":{"result":[{"meta":{
-			"symbol":"^BVSP","regularMarketPrice":169081.88,"chartPreviousClose":171006.1,
-			"regularMarketTime":1793294520,"currency":"BRL","exchangeTimezoneName":"America/Sao_Paulo"
-		}}],"error":null}}`); err != nil {
-			t.Errorf("write index response: %v", err)
+		switch {
+		case strings.Contains(r.URL.Path, "/v8/finance/chart/"):
+			if _, err := fmt.Fprint(w, `{"chart":{"result":[{
+				"meta":{
+					"symbol":"^BVSP","regularMarketPrice":169081.88,
+					"regularMarketTime":1793294520,"currency":"BRL","exchangeTimezoneName":"America/Sao_Paulo"
+				},
+				"timestamp":[1793208120,1793294520],
+				"indicators":{"quote":[{"close":[171006.1,169081.88]}]}
+			}],"error":null}}`); err != nil {
+				t.Errorf("write index response: %v", err)
+			}
+		case r.URL.Path == "/v7/finance/spark":
+			if _, err := fmt.Fprint(w, `{"spark":{"result":[{
+				"symbol":"PETR4.SA",
+				"response":[{
+					"timestamp":[1793208120,1793294520],
+					"indicators":{"quote":[{"close":[37.5,38.5]}]}
+				}]
+			}]}}`); err != nil {
+				t.Errorf("write history response: %v", err)
+			}
+		default:
+			t.Errorf("index path = %q", r.URL.Path)
 		}
 	}))
 	defer indexServer.Close()
@@ -203,6 +219,12 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	}
 	if snapshot.Indices[0].Price != 169081.88 || snapshot.Indices[0].Key != "ibovespa" {
 		t.Errorf("unexpected first index: %+v", snapshot.Indices[0])
+	}
+	if len(snapshot.Indices[0].History) != 2 || snapshot.Indices[0].History[1].Close != 169081.88 {
+		t.Errorf("unexpected first index history: %+v", snapshot.Indices[0].History)
+	}
+	if len(snapshot.Groups[0].Items[0].History) != 2 || snapshot.Groups[0].Items[0].History[1].Close != 38.5 {
+		t.Errorf("unexpected first asset history: %+v", snapshot.Groups[0].Items[0].History)
 	}
 	if got := requests.Load(); got != 12 {
 		t.Errorf("requests = %d, want 12", got)

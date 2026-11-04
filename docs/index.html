@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, atualizado a cada 30 minutos.">
+  <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, com gráficos diários dos índices e ativos, atualizado a cada 30 minutos.">
   <meta name="theme-color" content="#0b1120">
   <title>Altas e Baixas · stckcraw</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -15,7 +15,7 @@
     <div class="hero-copy">
       <div class="live"><span class="live-dot" aria-hidden="true"></span> dias úteis · 10h–18h · a cada 30 min</div>
       <h1>Altas <span>&</span> Baixas</h1>
-      <p class="subtitle">Principais índices e top 10 da B3 por variação do dia — ações, FIIs, FIPs, ETFs, BDRs e units.</p>
+      <p class="subtitle">Principais índices e top 10 da B3 por variação do dia — ações, FIIs, FIPs, ETFs, BDRs e units. Clique em um índice ou em qualquer parte da linha de um ativo para ver o histórico diário do último mês.</p>
       <p class="disclaimer">
         <span class="disclaimer-icon" aria-hidden="true">i</span>
         Dados informativos; não é recomendação de investimento.
@@ -50,7 +50,7 @@
   <main id="groups" class="groups" aria-live="polite"></main>
 
   <footer class="footer">
-    <span>Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a> · atualizações a cada 30 min em dias úteis (10h–18h)</span>
+    <span>Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a> + <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer">Yahoo Finance</a> · atualizações a cada 30 min em dias úteis (10h–18h)</span>
   </footer>
 
   <button id="back-to-top" class="back-to-top" type="button" aria-label="Voltar ao topo" tabindex="-1">
@@ -60,7 +60,8 @@
   </button>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

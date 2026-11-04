@@ -6,6 +6,9 @@ LDFLAGS=-ldflags "-X github.com/fabianoflorentino/stckcraw/internal/cli.Version=
 
 .PHONY: all build clean test test-short lint lint-fix fmt vet run download list dashboard preview docker-build docker-up docker-down docker-reset docker-logs help
 
+.DEFAULT_GOAL := help
+
+## all: Run clean, lint, test and build
 all: clean lint test build
 
 ## build: Build the application
@@ -91,4 +94,4 @@ docker-logs:
 ## help: Show this help message
 help:
 	@echo "Usage: make [target]"
-	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
+	@awk -F ': ' '/^## / {sub(/^## /, ""); printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)

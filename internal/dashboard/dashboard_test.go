@@ -132,6 +132,82 @@ func (f fakeIndexFetcher) FetchAll(_ context.Context, _ []marketindex.Definition
 	return f.quotes, f.err
 }
 
+type fakeHistoryFetcher struct {
+	histories map[string][]marketindex.HistoryPoint
+	err       error
+	symbols   []string
+}
+
+func (f *fakeHistoryFetcher) FetchHistories(_ context.Context, symbols []string) (map[string][]marketindex.HistoryPoint, error) {
+	f.symbols = append([]string(nil), symbols...)
+	return f.histories, f.err
+}
+
+func TestBuilderAttachesAssetHistory(t *testing.T) {
+	t.Parallel()
+
+	fetcher := fakeFetcher{assets: map[string][]brapi.Asset{
+		"stock/stock": {
+			{Symbol: "PETR4", Name: "Petrobras", Close: 38.5, Change: 1.25},
+			{Symbol: "VALE3", Name: "Vale", Close: 61.2, Change: 0.9},
+		},
+	}}
+	historyFetcher := &fakeHistoryFetcher{histories: map[string][]marketindex.HistoryPoint{
+		"PETR4": {{Date: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Close: 38}},
+		"VALE3": {{Date: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Close: 61}},
+	}}
+
+	builder, err := dashboard.NewBuilder(
+		fetcher,
+		dashboard.WithGroups([]brapi.Group{{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"}}),
+		dashboard.WithHistoryFetcher(historyFetcher),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder() error = %v", err)
+	}
+
+	snapshot, err := builder.Build(context.Background())
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if len(historyFetcher.symbols) != 2 || historyFetcher.symbols[0] != "PETR4" || historyFetcher.symbols[1] != "VALE3" {
+		t.Errorf("history symbols = %v, want [PETR4 VALE3]", historyFetcher.symbols)
+	}
+	for _, group := range []dashboard.Group{snapshot.Groups[0], snapshot.Lows[0]} {
+		for _, item := range group.Items {
+			if len(item.History) != 1 || item.History[0].Close != historyFetcher.histories[item.Symbol][0].Close {
+				t.Errorf("%s history = %+v", item.Symbol, item.History)
+			}
+		}
+	}
+}
+
+func TestBuilderHistoryFailureIsNotFatal(t *testing.T) {
+	t.Parallel()
+
+	fetcher := fakeFetcher{assets: map[string][]brapi.Asset{
+		"stock/stock": {{Symbol: "PETR4", Name: "Petrobras", Close: 38.5, Change: 1.25}},
+	}}
+	historyFetcher := &fakeHistoryFetcher{err: errors.New("history down")}
+
+	builder, err := dashboard.NewBuilder(
+		fetcher,
+		dashboard.WithGroups([]brapi.Group{{Key: "acoes", Label: "Ações", Type: "stock", SubType: "stock"}}),
+		dashboard.WithHistoryFetcher(historyFetcher),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder() error = %v", err)
+	}
+
+	snapshot, err := builder.Build(context.Background())
+	if err != nil {
+		t.Fatalf("Build() error = %v, want nil", err)
+	}
+	if len(snapshot.Groups[0].Items) != 1 || len(snapshot.Groups[0].Items[0].History) != 0 {
+		t.Errorf("unexpected group: %+v", snapshot.Groups[0])
+	}
+}
+
 func TestBuilderIncludesIndices(t *testing.T) {
 	t.Parallel()
 
@@ -360,6 +436,7 @@ func TestNewBuilderValidation(t *testing.T) {
 		{name: "empty groups", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithGroups(nil)}},
 		{name: "nil clock", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithClock(nil)}},
 		{name: "nil index fetcher", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithIndexFetcher(nil)}},
+		{name: "nil history fetcher", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithHistoryFetcher(nil)}},
 		{name: "empty index definitions", fetcher: fakeFetcher{}, opts: []dashboard.Option{dashboard.WithIndexDefinitions(nil)}},
 	}
 

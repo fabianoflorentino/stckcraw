@@ -18,6 +18,7 @@ const statusEl = document.getElementById("status");
 const refreshEl = document.getElementById("refresh");
 const toastEl = document.getElementById("toast");
 const backToTopEl = document.getElementById("back-to-top");
+const chartDialogEl = document.getElementById("index-chart");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
 const modeDescriptionEl = document.getElementById("mode-description");
 
@@ -59,6 +60,8 @@ let loading = false;
 let lastSnapshot = null;
 let toastTimer = null;
 let activeMode = "highs";
+let activeChartKey = null;
+let lastChartTrigger = null;
 
 const COLLAPSED_KEY = "stckcraw:collapsed";
 const collapsedGroups = loadCollapsedGroups();
@@ -142,6 +145,259 @@ function formatB3SessionDate(value) {
     }).format(date);
   } catch {
     return date.toLocaleDateString("pt-BR");
+  }
+}
+
+function formatIndexChartDate(value, timezone, withYear = false) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const options = {
+    timeZone: timezone || "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  };
+  if (withYear) {
+    options.year = "numeric";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("pt-BR", options).format(date);
+  } catch {
+    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  }
+}
+
+function indexChartPoints(index) {
+  const history = Array.isArray(index.history) ? index.history : [];
+  return history
+    .map((point) => ({
+      date: new Date(point.date),
+      close: Number(point.close),
+    }))
+    .filter((point) => (
+      Number.isFinite(point.close)
+      && point.close > 0
+      && !Number.isNaN(point.date.getTime())
+    ))
+    .sort((a, b) => a.date - b.date);
+}
+
+function periodChange(points) {
+  if (points.length < 2 || points[0].close <= 0) {
+    return 0;
+  }
+  return (points[points.length - 1].close / points[0].close - 1) * 100;
+}
+
+function chartScale(points, width, height, padding) {
+  const closes = points.map((point) => point.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const low = min === max ? min - 1 : min;
+  const high = min === max ? max + 1 : max;
+  const spread = high - low;
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  return {
+    min,
+    max,
+    low,
+    high,
+    x: (index) => (
+      padding.left
+      + (points.length === 1 ? innerWidth / 2 : (index / (points.length - 1)) * innerWidth)
+    ),
+    y: (value) => padding.top + (1 - (value - low) / spread) * innerHeight,
+  };
+}
+
+function buildSparkline(points, tone) {
+  const width = 120;
+  const height = 36;
+  const padding = { top: 3, right: 2, bottom: 3, left: 2 };
+  const scale = chartScale(points, width, height, padding);
+  const baseline = height - padding.bottom;
+  const line = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${scale.x(index).toFixed(2)},${scale.y(point.close).toFixed(2)}`)
+    .join(" ");
+  const area = `${line} L${scale.x(points.length - 1).toFixed(2)},${baseline} L${scale.x(0).toFixed(2)},${baseline} Z`;
+
+  return `<svg class="index-spark-svg ${tone}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="spark-area" d="${area}"/><path class="spark-line" d="${line}"/></svg>`;
+}
+
+function buildIndexChart(points, index, change) {
+  const width = 640;
+  const height = 300;
+  const padding = { top: 22, right: 18, bottom: 38, left: 96 };
+  const scale = chartScale(points, width, height, padding);
+  const tone = changeTone(change);
+  const baseline = height - padding.bottom;
+  const line = points
+    .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"}${scale.x(pointIndex).toFixed(2)},${scale.y(point.close).toFixed(2)}`)
+    .join(" ");
+  const area = `${line} L${scale.x(points.length - 1).toFixed(2)},${baseline} L${scale.x(0).toFixed(2)},${baseline} Z`;
+
+  const grid = [];
+  for (let step = 0; step <= 4; step += 1) {
+    const value = scale.low + ((scale.high - scale.low) * step) / 4;
+    const y = scale.y(value);
+    grid.push(
+      `<line class="chart-grid" x1="${padding.left}" y1="${y.toFixed(2)}" x2="${(width - padding.right).toFixed(2)}" y2="${y.toFixed(2)}"/>`,
+      `<text class="chart-axis-label" x="${(padding.left - 10).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end">${escapeHTML(formatPoints(value))}</text>`,
+    );
+  }
+
+  const dateIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+  const dateLabels = dateIndexes.map((pointIndex) => {
+    const anchor = pointIndex === 0
+      ? "start"
+      : pointIndex === points.length - 1
+        ? "end"
+        : "middle";
+    return `<text class="chart-axis-label chart-date-label" x="${scale.x(pointIndex).toFixed(2)}" y="${(height - 14).toFixed(2)}" text-anchor="${anchor}">${escapeHTML(formatIndexChartDate(points[pointIndex].date, index.timezone))}</text>`;
+  });
+
+  const lastIndex = points.length - 1;
+  const lastPoint = points[lastIndex];
+  const lastX = scale.x(lastIndex);
+  const lastY = scale.y(lastPoint.close);
+  const title = `Fechamentos diários de ${index.label || index.key} no último mês`;
+
+  return `<svg class="index-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(title)}"><title>${escapeHTML(title)}</title>${grid.join("")}<path class="chart-area ${tone}" d="${area}"/><path class="chart-line ${tone}" d="${line}"/><circle class="chart-dot ${tone}" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"/>${dateLabels.join("")}</svg>`;
+}
+
+function chartStat(label, value, tone = "neutral") {
+  const stat = document.createElement("div");
+  stat.className = "chart-stat";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "chart-stat-label";
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement("strong");
+  valueEl.className = `chart-stat-value ${tone}`;
+  valueEl.textContent = value;
+
+  stat.append(labelEl, valueEl);
+  return stat;
+}
+
+function renderChart(index) {
+  if (!chartDialogEl) {
+    return;
+  }
+
+  const points = indexChartPoints(index);
+  const hadFocus = chartDialogEl.contains(document.activeElement);
+  const content = document.createElement("div");
+  content.className = "chart-dialog-content";
+
+  const head = document.createElement("div");
+  head.className = "chart-dialog-head";
+
+  const titleWrap = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "chart-eyebrow";
+  eyebrow.textContent = "Histórico diário · 1 mês";
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "chart-title-row";
+  const title = document.createElement("h2");
+  title.id = "index-chart-title";
+  title.className = "chart-title";
+  title.textContent = index.label || index.key;
+  titleRow.appendChild(title);
+
+  if (index.symbol) {
+    const symbol = document.createElement("span");
+    symbol.className = "chart-symbol";
+    symbol.textContent = index.symbol;
+    titleRow.appendChild(symbol);
+  }
+
+  titleWrap.append(eyebrow, titleRow);
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "chart-close";
+  closeButton.setAttribute("aria-label", "Fechar gráfico");
+  closeButton.textContent = "×";
+  closeButton.addEventListener("click", closeChart);
+
+  head.append(titleWrap, closeButton);
+  content.appendChild(head);
+
+  if (points.length < 2) {
+    const empty = document.createElement("p");
+    empty.className = "chart-empty";
+    empty.textContent = index.error
+      ? `Dados indisponíveis: ${index.error}`
+      : "Histórico diário indisponível para este item.";
+    content.appendChild(empty);
+    chartDialogEl.replaceChildren(content);
+    if (hadFocus) {
+      chartDialogEl.querySelector(".chart-close")?.focus();
+    }
+    return;
+  }
+
+  const change = periodChange(points);
+  const lastPoint = points[points.length - 1];
+  const summary = document.createElement("div");
+  summary.className = "chart-summary";
+  summary.append(
+    chartStat("Último", formatPoints(index.price)),
+    chartStat("Variação do dia", formatPercent(index.change), changeTone(index.change)),
+    chartStat("No período", formatPercent(change), changeTone(change)),
+    chartStat("Mín / Máx", `${formatPoints(Math.min(...points.map((point) => point.close)))} / ${formatPoints(Math.max(...points.map((point) => point.close)))}`),
+  );
+
+  const canvas = document.createElement("div");
+  canvas.className = "chart-canvas";
+  canvas.innerHTML = buildIndexChart(points, index, change);
+
+  const note = document.createElement("p");
+  note.className = "chart-note";
+  note.textContent = `Fechamentos diários · último ponto em ${formatIndexChartDate(lastPoint.date, index.timezone, true)} · Yahoo Finance`;
+
+  content.append(summary, canvas, note);
+  chartDialogEl.replaceChildren(content);
+  if (hadFocus) {
+    chartDialogEl.querySelector(".chart-close")?.focus();
+  }
+}
+
+function openChart(chart, trigger) {
+  if (!chartDialogEl) {
+    return;
+  }
+
+  activeChartKey = chart.key || chart.symbol || "";
+  lastChartTrigger = trigger || null;
+  renderChart(chart);
+
+  if (typeof chartDialogEl.showModal === "function") {
+    if (!chartDialogEl.open) {
+      chartDialogEl.showModal();
+    }
+  } else {
+    chartDialogEl.setAttribute("open", "");
+  }
+}
+
+function closeChart() {
+  if (!chartDialogEl?.open) {
+    return;
+  }
+
+  if (typeof chartDialogEl.close === "function") {
+    chartDialogEl.close();
+  } else {
+    chartDialogEl.removeAttribute("open");
   }
 }
 
@@ -231,6 +487,7 @@ function renderIndexCard(index, position) {
   const card = document.createElement("article");
   card.className = "index-card";
   card.style.setProperty("--i", String(position));
+  card.dataset.indexKey = index.key || "";
   if (index.error) {
     card.classList.add("error");
   }
@@ -239,6 +496,7 @@ function renderIndexCard(index, position) {
   const value = index.error ? "—" : formatPoints(index.price);
   const change = index.error ? "indisponível" : formatPercent(index.change);
   const meta = index.error || formatIndexTime(index);
+  const chartPoints = indexChartPoints(index);
 
   card.innerHTML = `
     <div class="index-head">
@@ -248,6 +506,26 @@ function renderIndexCard(index, position) {
     <strong class="index-value">${escapeHTML(value)}</strong>
     <span class="index-change ${tone}">${escapeHTML(change)}</span>
     <span class="index-meta" title="${escapeHTML(meta)}">${escapeHTML(meta)}</span>`;
+
+  if (!index.error && chartPoints.length >= 2) {
+    const spark = document.createElement("div");
+    spark.className = "index-spark";
+    spark.innerHTML = buildSparkline(chartPoints, changeTone(periodChange(chartPoints)));
+    card.appendChild(spark);
+    card.classList.add("interactive");
+    card.tabIndex = 0;
+    card.title = "Clique para ver o gráfico diário";
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-haspopup", "dialog");
+    card.setAttribute("aria-label", `Abrir gráfico diário de ${index.label || index.key}`);
+    card.addEventListener("click", () => openChart(index, card));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openChart(index, card);
+      }
+    });
+  }
 
   return card;
 }
@@ -312,6 +590,50 @@ function renderHighlights(groups, mode) {
   );
 }
 
+function assetChart(item) {
+  return {
+    key: `asset:${item.symbol}`,
+    label: item.symbol,
+    symbol: item.name || "",
+    price: item.price,
+    change: item.change,
+    timezone: "America/Sao_Paulo",
+    history: item.history,
+  };
+}
+
+function findChartRecord(key) {
+  const indexRecord = (lastSnapshot?.indices || []).find((item) => item.key === key);
+  if (indexRecord) {
+    return indexRecord;
+  }
+  if (!key.startsWith("asset:")) {
+    return null;
+  }
+
+  const symbol = key.slice("asset:".length);
+  for (const groups of [lastSnapshot?.groups, lastSnapshot?.lows]) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const item = (group.items || []).find((entry) => entry.symbol === symbol);
+      if (item) {
+        return assetChart(item);
+      }
+    }
+  }
+  return null;
+}
+
+function refreshActiveChart() {
+  if (!chartDialogEl?.open || !activeChartKey) {
+    return;
+  }
+
+  const chart = findChartRecord(activeChartKey);
+  if (chart) {
+    renderChart(chart);
+  }
+}
+
 function buildTable(items) {
   const maxAbs = items.reduce(
     (max, item) => Math.max(max, Math.abs(item.change)),
@@ -326,6 +648,7 @@ function buildTable(items) {
     <tr>
       <th>#</th>
       <th>Ativo</th>
+      <th>Gráfico</th>
       <th>Último</th>
       <th>Var. dia</th>
       <th>Volume (R$)</th>
@@ -342,14 +665,23 @@ function buildTable(items) {
       ? Math.max(4, Math.min(100, (Math.abs(item.change) / maxAbs) * 100))
       : 0;
     const sector = item.sector || "—";
+    const chartPoints = indexChartPoints(item);
+    const chartButton = chartPoints.length >= 2
+      ? `<button type="button" class="spark-button" data-chart-key="asset:${escapeHTML(item.symbol)}" aria-label="Abrir gráfico diário de ${escapeHTML(item.symbol)}" title="Ver gráfico diário">${buildSparkline(chartPoints, changeTone(periodChange(chartPoints)))}</button>`
+      : '<span class="chart-na">—</span>';
 
     const row = document.createElement("tr");
+    row.className = "asset-row";
+    row.title = chartPoints.length >= 2
+      ? "Clique para ver o gráfico diário"
+      : "Histórico diário indisponível para este ativo";
     row.innerHTML = `
       <td><span class="rank${rankClass}">${escapeHTML(item.rank)}</span></td>
       <td>
         <span class="symbol">${escapeHTML(item.symbol)}</span>
         <span class="asset-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
       </td>
+      <td class="chart-cell">${chartButton}</td>
       <td>${formatMoney(item.price)}</td>
       <td class="change-cell">
         <span class="change ${tone}">${formatPercent(item.change)}</span>
@@ -358,6 +690,19 @@ function buildTable(items) {
       <td>${formatCompact(item.financialVolume)}</td>
       <td>${formatCompact(item.marketCap)}</td>
       <td class="sector" title="${escapeHTML(sector)}">${escapeHTML(sector)}</td>`;
+
+    const chartButtonEl = row.querySelector(".spark-button");
+    if (chartButtonEl) {
+      chartButtonEl.addEventListener("click", () => openChart(assetChart(item), chartButtonEl));
+    }
+    const chartTrigger = chartButtonEl || row;
+    row.addEventListener("click", (event) => {
+      if (event.target.closest(".spark-button")) {
+        return;
+      }
+      openChart(assetChart(item), chartTrigger);
+    });
+
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
@@ -504,6 +849,7 @@ function render(snapshot) {
   renderIndices(snapshot.indices || []);
   renderActiveGroups();
   updateStatus(snapshot);
+  refreshActiveChart();
 }
 
 function isSnapshotStale(snapshot) {
@@ -614,9 +960,36 @@ async function fetchGroupLive(group, sortOrder) {
   return items;
 }
 
+function historyBySymbol(groups) {
+  const histories = new Map();
+  for (const group of Array.isArray(groups) ? groups : []) {
+    for (const item of group.items || []) {
+      if (Array.isArray(item.history) && item.history.length > 0) {
+        histories.set(item.symbol, item.history);
+      }
+    }
+  }
+  return histories;
+}
+
+function applyHistories(items, histories) {
+  if (histories.size === 0) {
+    return items;
+  }
+  return items.map((item) => {
+    if (Array.isArray(item.history) && item.history.length > 0) {
+      return item;
+    }
+    const history = histories.get(item.symbol);
+    return history ? { ...item, history } : item;
+  });
+}
+
 async function fetchLiveSnapshot(previousIndices = [], previousSnapshot = null) {
   const groups = [];
   const lows = [];
+  const previousHighHistories = historyBySymbol(previousSnapshot?.groups);
+  const previousLowHistories = historyBySymbol(previousSnapshot?.lows);
   let failures = 0;
 
   for (const group of LIVE_GROUPS) {
@@ -639,8 +1012,18 @@ async function fetchLiveSnapshot(previousIndices = [], previousSnapshot = null) 
       failures += 1;
     }
 
-    groups.push({ key: group.key, label: group.label, items: highItems, error: highError || undefined });
-    lows.push({ key: group.key, label: group.label, items: lowItems, error: lowError || undefined });
+    groups.push({
+      key: group.key,
+      label: group.label,
+      items: applyHistories(highItems, previousHighHistories),
+      error: highError || undefined,
+    });
+    lows.push({
+      key: group.key,
+      label: group.label,
+      items: applyHistories(lowItems, previousLowHistories),
+      error: lowError || undefined,
+    });
   }
 
   if (failures === LIVE_GROUPS.length * 2) {
@@ -722,6 +1105,29 @@ refreshEl.addEventListener("click", () => {
 for (const button of modeButtons) {
   button.addEventListener("click", () => {
     setMode(button.dataset.mode);
+  });
+}
+
+if (chartDialogEl) {
+  chartDialogEl.addEventListener("click", (event) => {
+    if (event.target === chartDialogEl) {
+      closeChart();
+    }
+  });
+
+  chartDialogEl.addEventListener("close", () => {
+    const closedKey = activeChartKey;
+    activeChartKey = null;
+
+    const trigger = lastChartTrigger?.isConnected
+      ? lastChartTrigger
+      : Array.from(document.querySelectorAll("[data-index-key], [data-chart-key]"))
+        .find((element) => (
+          element.dataset.indexKey === closedKey
+          || element.dataset.chartKey === closedKey
+        ));
+    trigger?.focus();
+    lastChartTrigger = null;
   });
 }
 
