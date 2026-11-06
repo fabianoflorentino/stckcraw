@@ -154,6 +154,46 @@ a:hover {
   z-index: 1;
 }
 
+.brand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-mark {
+  display: block;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  filter: drop-shadow(0 8px 18px rgba(47, 125, 246, 0.28));
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.brand:hover .brand-mark {
+  transform: translateY(-2px) rotate(-4deg);
+  filter: drop-shadow(0 12px 24px rgba(47, 125, 246, 0.4));
+}
+
+.brand-name {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.brand-row .live {
+  margin-bottom: 0;
+}
+
 .live {
   display: inline-flex;
   align-items: center;
@@ -1462,6 +1502,24 @@ body:has(.chart-dialog[open]) {
   padding: 0 24px 40px;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.footer-brand img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  filter: drop-shadow(0 4px 10px rgba(47, 125, 246, 0.3));
 }
 
 .back-to-top {
