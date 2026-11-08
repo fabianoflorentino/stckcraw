@@ -813,13 +813,36 @@ function updateStatus(snapshot) {
   statusEl.classList.remove("error");
 }
 
-function highlightCard(label, value, meta, tone) {
+function highlightCard(label, value, meta, tone, options = {}) {
   const card = document.createElement("article");
   card.className = "highlight";
   card.innerHTML = `
     <span class="highlight-label">${escapeHTML(label)}</span>
     <strong class="highlight-value ${tone}">${escapeHTML(value)}</strong>
     <span class="highlight-meta">${escapeHTML(meta)}</span>`;
+
+  if (options.onClick) {
+    card.classList.add("interactive");
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-haspopup", options.haspopup || "false");
+    card.setAttribute("aria-label", options.ariaLabel || `${label}: ${value}`);
+    card.title = options.title || "";
+    if (options.action) {
+      card.dataset.action = options.action;
+    }
+    if (options.chartKey) {
+      card.dataset.chartKey = options.chartKey;
+    }
+    card.addEventListener("click", () => options.onClick(card));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        options.onClick(card);
+      }
+    });
+  }
+
   return card;
 }
 
@@ -923,6 +946,30 @@ function renderHighlights(groups, mode) {
   }
 
   const config = MODES[mode] || MODES.highs;
+  const collapsibleGroups = groups.filter((group) => group.key);
+  const allCollapsed = collapsibleGroups.length > 0
+    && collapsibleGroups.every((group) => collapsedGroups.has(group.key));
+
+  const topChangeOptions = topChange
+    ? {
+      action: "open-chart",
+      haspopup: "dialog",
+      chartKey: `asset:${topChange.symbol}`,
+      title: "Clique para ver o gráfico diário",
+      ariaLabel: `Abrir gráfico diário de ${topChange.symbol}`,
+      onClick: (card) => openChart(assetChart(topChange), card),
+    }
+    : {};
+  const topVolumeOptions = topVolume
+    ? {
+      action: "open-chart",
+      haspopup: "dialog",
+      chartKey: `asset:${topVolume.symbol}`,
+      title: "Clique para ver o gráfico diário",
+      ariaLabel: `Abrir gráfico diário de ${topVolume.symbol}`,
+      onClick: (card) => openChart(assetChart(topVolume), card),
+    }
+    : {};
 
   highlightsEl.replaceChildren(
     highlightCard(
@@ -932,6 +979,7 @@ function renderHighlights(groups, mode) {
         ? `${topChange.group} · ${formatPercent(topChange.change)}`
         : "sem dados",
       topChange ? changeTone(topChange.change) : "neutral",
+      topChangeOptions,
     ),
     highlightCard(
       "Maior volume",
@@ -940,12 +988,21 @@ function renderHighlights(groups, mode) {
         ? `${topVolume.group} · ${formatCompact(topVolume.financialVolume)}`
         : "sem dados",
       "neutral",
+      topVolumeOptions,
     ),
     highlightCard(
       "Cobertura",
       `${items.length} ativos`,
-      `${groups.length} grupos · top 10 ${config.coverage} ${lastSnapshot?.b3Closed ? "do último pregão" : "do dia"}`,
+      `${groups.length} grupos · ${allCollapsed ? "expandir" : "recolher"} categorias`,
       "neutral",
+      collapsibleGroups.length > 0
+        ? {
+          action: "toggle-groups",
+          title: allCollapsed ? "Expandir todas as categorias" : "Recolher todas as categorias",
+          ariaLabel: `${allCollapsed ? "Expandir" : "Recolher"} todas as categorias de ativos`,
+          onClick: () => toggleAllGroups(groups),
+        }
+        : {},
     ),
   );
 }
@@ -1156,14 +1213,30 @@ function renderFatal(message) {
   groupsEl.replaceChildren(box);
 }
 
+function activeGroups() {
+  return activeMode === "lows"
+    ? (Array.isArray(lastSnapshot?.lows) ? lastSnapshot.lows : [])
+    : (Array.isArray(lastSnapshot?.groups) ? lastSnapshot.groups : []);
+}
+
+function toggleAllGroups(groups) {
+  const collapsible = groups.filter((group) => group.key);
+  const collapse = !collapsible.every((group) => collapsedGroups.has(group.key));
+
+  for (const group of collapsible) {
+    setCollapsed(group.key, collapse);
+  }
+
+  renderActiveGroups();
+  highlightsEl.querySelector('[data-action="toggle-groups"]')?.focus();
+}
+
 function renderActiveGroups() {
   if (!lastSnapshot) {
     return;
   }
 
-  const groups = activeMode === "lows"
-    ? (Array.isArray(lastSnapshot.lows) ? lastSnapshot.lows : [])
-    : (Array.isArray(lastSnapshot.groups) ? lastSnapshot.groups : []);
+  const groups = activeGroups();
 
   groupsEl.replaceChildren();
 
