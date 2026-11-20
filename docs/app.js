@@ -1356,6 +1356,9 @@ function setMode(mode) {
   }
 
   activeMode = mode;
+  if (modeSwitchEl) {
+    modeSwitchEl.dataset.mode = mode;
+  }
   for (const button of modeButtons) {
     const isActive = button.dataset.mode === mode;
     button.classList.toggle("active", isActive);
