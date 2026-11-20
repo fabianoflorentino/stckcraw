@@ -538,7 +538,29 @@ function renderChart(index) {
   closeButton.textContent = "×";
   closeButton.addEventListener("click", closeChart);
 
-  head.append(titleWrap, closeButton);
+  const actions = document.createElement("div");
+  actions.className = "chart-actions";
+
+  const assetSymbol = String(index.key || "").startsWith("asset:")
+    ? normalizeWalletSymbol(index.key.slice("asset:".length))
+    : "";
+  if (isValidWalletSymbol(assetSymbol)) {
+    const assetName = index.symbol || index.label || assetSymbol;
+    const star = document.createElement("button");
+    star.type = "button";
+    star.className = "wallet-star chart-star";
+    star.dataset.symbol = assetSymbol;
+    star.dataset.name = assetName;
+    updateWalletStar(star, assetSymbol);
+    star.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleWallet(assetSymbol, assetName);
+    });
+    actions.appendChild(star);
+  }
+
+  actions.appendChild(closeButton);
+  head.append(titleWrap, actions);
   content.appendChild(head);
 
   if (index.loading) {
@@ -883,13 +905,13 @@ function renderSearchResults(items, query) {
   }
 
   items.forEach((item, index) => {
-    const option = document.createElement("button");
-    option.type = "button";
+    const option = document.createElement("div");
     option.className = "search-result";
     option.id = `search-option-${index}`;
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", "false");
     option.innerHTML = `
+      ${walletStarMarkup(item.symbol, item.name, "search-result-star")}
       <span class="search-result-main">
         <span class="search-result-symbol">${escapeHTML(item.symbol)}</span>
         <span class="search-result-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
@@ -900,6 +922,11 @@ function renderSearchResults(items, query) {
         <span class="search-result-change ${changeTone(item.change)}">${escapeHTML(formatPercent(item.change))}</span>
       </span>`;
     option.addEventListener("click", () => selectSearchResult(item));
+    const star = option.querySelector(".search-result-star");
+    star?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleWallet(item.symbol, item.name);
+    });
     searchResultsEl.appendChild(option);
   });
 
@@ -1378,7 +1405,6 @@ function buildTable(items) {
       : 0;
     const sector = item.sector || "—";
     const chartPoints = indexChartPoints(item);
-    const inWallet = isInWallet(item.symbol);
     const chartButton = chartPoints.length >= 2
       ? `<button type="button" class="spark-button" data-chart-key="asset:${escapeHTML(item.symbol)}" aria-label="${escapeHTML(t("openChartAria", { symbol: item.symbol }))}" title="${escapeHTML(t("openChartTitle"))}">${buildSparkline(chartPoints, changeTone(periodChange(chartPoints)))}</button>`
       : '<span class="chart-na">—</span>';
@@ -1392,7 +1418,7 @@ function buildTable(items) {
       <td><span class="rank${rankClass}">${escapeHTML(item.rank)}</span></td>
       <td>
         <span class="asset-cell">
-          <button type="button" class="wallet-star" data-symbol="${escapeHTML(item.symbol)}" data-name="${escapeHTML(item.name)}" aria-pressed="${inWallet}" title="${escapeHTML(inWallet ? t("rowStarRemove", { name: item.name || item.symbol }) : t("rowStarAdd", { name: item.name || item.symbol }))}" aria-label="${escapeHTML(inWallet ? t("rowStarRemove", { name: item.name || item.symbol }) : t("rowStarAdd", { name: item.name || item.symbol }))}">${inWallet ? "★" : "☆"}</button>
+          ${walletStarMarkup(item.symbol, item.name)}
           <span class="asset-id">
             <span class="symbol">${escapeHTML(item.symbol)}</span>
             <span class="asset-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
@@ -1828,6 +1854,13 @@ function updateWalletStar(star, symbol) {
   star.setAttribute("aria-label", label);
   star.setAttribute("title", label);
   star.textContent = inWallet ? "★" : "☆";
+}
+
+function walletStarMarkup(symbol, name, extraClass = "") {
+  const inWallet = isInWallet(symbol);
+  const label = t(inWallet ? "rowStarRemove" : "rowStarAdd", { name: name || symbol });
+  const classes = extraClass ? `wallet-star ${extraClass}` : "wallet-star";
+  return `<button type="button" class="${classes}" data-symbol="${escapeHTML(symbol)}" data-name="${escapeHTML(name)}" aria-pressed="${inWallet}" title="${escapeHTML(label)}" aria-label="${escapeHTML(label)}">${inWallet ? "★" : "☆"}</button>`;
 }
 
 function updateWalletStars(symbol) {
@@ -2414,13 +2447,13 @@ function renderWalletSuggestions(items, query) {
 
   walletSuggestionsEl.replaceChildren();
   items.forEach((item, index) => {
-    const option = document.createElement("button");
-    option.type = "button";
+    const option = document.createElement("div");
     option.className = "search-result wallet-suggestion";
     option.id = `wallet-suggestion-${index}`;
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", "false");
     option.innerHTML = `
+      ${walletStarMarkup(item.symbol, item.name, "search-result-star")}
       <span class="search-result-main">
         <span class="search-result-symbol">${escapeHTML(item.symbol)}</span>
         <span class="search-result-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
@@ -2431,6 +2464,11 @@ function renderWalletSuggestions(items, query) {
         <span class="search-result-change ${changeTone(item.change)}">${escapeHTML(formatPercent(item.change))}</span>
       </span>`;
     option.addEventListener("click", () => selectWalletSuggestion(item));
+    const star = option.querySelector(".search-result-star");
+    star?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleWallet(item.symbol, item.name);
+    });
     walletSuggestionsEl.appendChild(option);
   });
 

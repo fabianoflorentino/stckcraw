@@ -737,7 +737,7 @@ h1 .hero-title-amp {
 
 .search-result {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
@@ -748,6 +748,13 @@ h1 .hero-title-amp {
   text-align: left;
   cursor: pointer;
   transition: background 0.18s ease;
+}
+
+.search-result-star {
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  font-size: 0.82rem;
 }
 
 .search-result:hover,
@@ -1098,6 +1105,19 @@ h1 .hero-title-amp {
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chart-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-star {
+  width: 36px;
+  height: 36px;
+  font-size: 1.15rem;
 }
 
 .chart-close {
