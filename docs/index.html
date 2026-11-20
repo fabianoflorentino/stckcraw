@@ -12,7 +12,7 @@
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="style.css?v=35">
+  <link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -113,6 +113,10 @@
     <p id="wallet-empty" class="wallet-empty">
       Sua carteira está vazia. Use a estrela nas tabelas de altas/baixas ou adicione um ticker acima.
     </p>
+    <p class="wallet-note">
+      <span class="disclaimer-icon" aria-hidden="true">i</span>
+      A carteira é salva apenas neste navegador (localStorage). Limpar os dados do site ou trocar de dispositivo apaga a lista — use <strong>Exportar</strong> para guardar um backup e <strong>Importar</strong> para restaurar.
+    </p>
   </section>
   <main id="groups" class="groups reveal" aria-live="polite"></main>
 
@@ -162,6 +166,6 @@
 
   <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>

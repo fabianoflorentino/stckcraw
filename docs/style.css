@@ -1480,6 +1480,25 @@ body:has(.chart-dialog[open]) {
   text-align: center;
 }
 
+.wallet-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 14px 2px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--card-border);
+  border-radius: 12px;
+  background: rgba(16, 27, 49, 0.35);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.wallet-note strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
 .wallet-table-wrap {
   margin-top: 12px;
   border: 1px solid var(--card-border);
