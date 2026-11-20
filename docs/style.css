@@ -2,9 +2,10 @@
   color-scheme: dark;
   --bg: #070d1a;
   --bg-soft: #0d1628;
-  --card: #101b31;
-  --card-strong: #14213a;
-  --card-border: #233252;
+  --card: rgba(16, 27, 49, 0.72);
+  --card-strong: rgba(20, 33, 58, 0.82);
+  --panel: rgba(13, 22, 40, 0.92);
+  --card-border: rgba(148, 163, 184, 0.16);
   --text: #e9f0fb;
   --muted: #8fa2c2;
   --accent: #59a8ff;
@@ -12,11 +13,19 @@
   --positive: #3ddc97;
   --negative: #ff6b6b;
   --neutral: #9aa8bf;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  --flat: #f2b53d;
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.4), 0 10px 24px rgba(2, 6, 23, 0.32);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.035), 0 12px 28px rgba(2, 6, 23, 0.38), 0 28px 56px rgba(2, 6, 23, 0.24);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 55px rgba(2, 6, 23, 0.55), 0 8px 20px rgba(2, 6, 23, 0.35);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 * {
   box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 html {
@@ -255,7 +264,8 @@ h1 span {
   padding: 8px 14px;
   border: 1px solid var(--card-border);
   border-radius: 999px;
-  background: rgba(16, 27, 49, 0.72);
+  background: var(--card);
+  box-shadow: var(--shadow-sm), var(--highlight);
   color: var(--muted);
   font-size: 0.76rem;
   line-height: 1.4;
@@ -346,7 +356,8 @@ h1 span {
 
 .button-ghost {
   border-color: var(--card-border);
-  background: rgba(16, 27, 49, 0.7);
+  background: var(--card);
+  box-shadow: var(--shadow-sm), var(--highlight);
   color: var(--text);
 }
 
@@ -374,21 +385,50 @@ h1 span {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px 12px;
+  width: calc(100% - 48px);
+  max-width: 1232px;
+  margin: 0 auto 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
+  box-shadow: var(--shadow), var(--highlight);
 }
 
 .mode-switch {
-  display: inline-flex;
-  gap: 4px;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 4px;
   border: 1px solid var(--card-border);
   border-radius: 999px;
-  background: rgba(16, 27, 49, 0.72);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
+  box-shadow: var(--shadow-sm), var(--highlight);
+}
+
+.mode-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: linear-gradient(120deg, #2f7df6, #7c5cff 58%, #1bbf82);
+  background-size: 180% 100%;
+  box-shadow: 0 8px 22px rgba(47, 125, 246, 0.28);
+  pointer-events: none;
+  transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.mode-switch[data-mode="lows"] .mode-indicator {
+  transform: translateX(100%);
 }
 
 .mode-button {
+  position: relative;
+  z-index: 1;
   padding: 8px 20px;
   border: 0;
   border-radius: 999px;
@@ -532,8 +572,8 @@ h1 span {
   padding: 6px;
   border: 1px solid var(--card-border);
   border-radius: 16px;
-  background: var(--card-strong);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5);
+  background: var(--panel);
+  box-shadow: var(--shadow), var(--highlight);
 }
 
 .search-result {
@@ -654,7 +694,8 @@ h1 span {
     var(--card);
   animation: rise 0.5s ease both;
   animation-delay: calc(var(--i, 0) * 60ms);
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: var(--shadow-card), var(--highlight);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .index-card::after {
@@ -670,7 +711,7 @@ h1 span {
 
 .index-card:hover {
   border-color: rgba(89, 168, 255, 0.45);
-  box-shadow: 0 16px 38px rgba(47, 125, 246, 0.16);
+  box-shadow: var(--shadow), 0 0 28px rgba(47, 125, 246, 0.12), var(--highlight);
   transform: translateY(-3px);
 }
 
@@ -830,9 +871,9 @@ h1 span {
   overflow: auto;
   border: 1px solid var(--card-border);
   border-radius: 22px;
-  background: var(--card);
+  background: var(--panel);
   color: var(--text);
-  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow), var(--highlight);
   opacity: 1;
   transform: translateY(0) scale(1);
   transform-origin: center;
@@ -907,6 +948,7 @@ h1 span {
   border: 1px solid var(--card-border);
   border-radius: 50%;
   background: var(--card-strong);
+  box-shadow: var(--shadow-sm), var(--highlight);
   color: var(--muted);
   font-size: 1.35rem;
   line-height: 1;
@@ -1040,7 +1082,7 @@ h1 span {
 }
 
 .chart-dot {
-  stroke: var(--card);
+  stroke: var(--bg);
   stroke-width: 2;
 }
 
@@ -1092,12 +1134,13 @@ body:has(.chart-dialog[open]) {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(89, 168, 255, 0.08), transparent 58%), var(--card);
   animation: rise 0.5s ease both;
+  box-shadow: var(--shadow-card), var(--highlight);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .highlight:hover {
   border-color: rgba(89, 168, 255, 0.42);
-  box-shadow: 0 14px 34px rgba(47, 125, 246, 0.14);
+  box-shadow: var(--shadow), 0 0 28px rgba(47, 125, 246, 0.12), var(--highlight);
   transform: translateY(-3px);
 }
 
@@ -1183,7 +1226,7 @@ body:has(.chart-dialog[open]) {
   background:
     linear-gradient(180deg, rgba(89, 168, 255, 0.06), transparent 24%),
     var(--card);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card), var(--highlight);
   animation: rise 0.55s ease both;
   animation-delay: calc(var(--i, 0) * 65ms);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -1191,7 +1234,7 @@ body:has(.chart-dialog[open]) {
 
 .group:hover {
   border-color: rgba(89, 168, 255, 0.32);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.4), 0 0 32px rgba(47, 125, 246, 0.08);
+  box-shadow: var(--shadow), 0 0 32px rgba(47, 125, 246, 0.1), var(--highlight);
 }
 
 .group::before {
@@ -1319,7 +1362,8 @@ body:has(.chart-dialog[open]) {
   margin-left: 4px;
   border: 1px solid var(--card-border);
   border-radius: 50%;
-  background: rgba(16, 27, 49, 0.7);
+  background: var(--card);
+  box-shadow: var(--shadow-sm), var(--highlight);
   color: var(--muted);
   transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
@@ -1736,7 +1780,9 @@ body:has(.chart-dialog[open]) {
   }
 
   .toolbar {
-    padding: 0 16px 10px;
+    width: calc(100% - 32px);
+    margin: 0 auto 10px;
+    padding: 10px 12px;
   }
 
   .mode-switch {
