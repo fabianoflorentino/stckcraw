@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, com gráficos diários dos índices e ativos, atualizado a cada 30 minutos.">
+  <meta id="meta-description" name="description" content="Top 10 altas e baixas da B3 por tipo de ativo, com gráficos diários dos índices e ativos, atualizado a cada 30 minutos.">
   <meta name="theme-color" content="#0b1120">
   <script>document.documentElement.classList.add("js");</script>
   <noscript><style>.reveal,.reveal-right{opacity:1 !important;transform:none !important}</style></noscript>
@@ -12,7 +12,7 @@
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -26,96 +26,104 @@
           <img class="brand-mark" src="favicon.svg" alt="" width="42" height="42" aria-hidden="true">
           <span class="brand-name">stckcraw</span>
         </span>
-        <div class="live"><span class="live-dot" aria-hidden="true"></span> dias úteis · 10h–18h · a cada 30 min</div>
+        <div class="live"><span class="live-dot" aria-hidden="true"></span> <span data-i18n="liveBadge">dias úteis · 10h–18h · a cada 30 min</span></div>
       </div>
-      <h1>Altas <span>&</span> Baixas</h1>
-      <p class="subtitle">Principais índices e top 10 da B3 por variação do dia — ações, FIIs, FIPs, ETFs, BDRs e units. Clique em um índice, em um destaque ou em qualquer parte da linha de um ativo para ver o histórico diário do último mês; use o card de cobertura para expandir ou recolher as categorias.</p>
+      <h1><span data-i18n="heroTitleLead">Altas</span> <span class="hero-title-amp">&amp;</span> <span data-i18n="heroTitleTail">Baixas</span></h1>
+      <p class="subtitle" data-i18n="subtitle">Principais índices e top 10 da B3 por variação do dia — ações, FIIs, FIPs, ETFs, BDRs e units. Clique em um índice, em um destaque ou em qualquer parte da linha de um ativo para ver o histórico diário do último mês; use o card de cobertura para expandir ou recolher as categorias.</p>
       <p class="disclaimer">
         <span class="disclaimer-icon" aria-hidden="true">i</span>
-        Dados informativos; não é recomendação de investimento.
+        <span data-i18n="disclaimer">Dados informativos; não é recomendação de investimento.</span>
       </p>
     </div>
 
     <div class="hero-side reveal reveal-right">
-      <div id="ticker-strip" class="ticker-strip" role="group" aria-label="Cotações de dólar, euro, ouro, petróleo e bitcoin" hidden></div>
+      <div id="ticker-strip" class="ticker-strip" role="group" data-i18n-aria="tickerAria" aria-label="Cotações de dólar, euro, ouro, petróleo e bitcoin" hidden></div>
 
       <div class="hero-actions">
-        <p id="status" class="status" aria-live="polite">Carregando…</p>
+        <button id="lang-toggle" class="lang-switch" type="button" role="switch" aria-checked="true"
+          data-lang="pt-br" data-i18n-aria="language" aria-label="Alterar idioma">
+          <span class="lang-switch-track" aria-hidden="true">
+            <span class="lang-switch-knob"></span>
+            <span class="lang-switch-label" data-lang-label="pt-br">PT-BR</span>
+            <span class="lang-switch-label" data-lang-label="en">EN</span>
+          </span>
+        </button>
+        <p id="status" class="status" aria-live="polite" data-i18n="statusLoading">Carregando…</p>
         <div class="actions">
           <button id="refresh" class="button button-primary" type="button"
-            title="Recarrega o JSON mais recente. Para gerar novos dados, rode o workflow no GitHub.">
+            data-i18n-title="refreshTitle" title="Recarrega o JSON mais recente. Para gerar novos dados, rode o workflow no GitHub.">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="button-label">Atualizar</span>
+            <span class="button-label" data-i18n="refresh">Atualizar</span>
           </button>
           <a class="button button-ghost"
             href="https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml"
-            target="_blank" rel="noopener noreferrer">Workflow</a>
+            target="_blank" rel="noopener noreferrer" data-i18n="workflow">Workflow</a>
         </div>
       </div>
     </div>
   </header>
 
-  <section class="toolbar reveal" aria-label="Direção da variação">
+  <section class="toolbar reveal" data-i18n-aria="modeSwitchAria" aria-label="Direção da variação">
     <div class="toolbar-start">
-      <div class="mode-switch" role="tablist" aria-label="Altas, baixas ou carteira" data-mode="highs">
+      <div class="mode-switch" role="tablist" data-i18n-aria="modeSwitchAria" aria-label="Altas, baixas ou carteira" data-mode="highs">
         <span class="mode-indicator" aria-hidden="true"></span>
-        <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
-        <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
-        <button type="button" class="mode-button" data-mode="wallet" role="tab" aria-selected="false" aria-controls="wallet">Carteira</button>
+        <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups" data-i18n="tabGainers">Altas</button>
+        <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups" data-i18n="tabLosers">Baixas</button>
+        <button type="button" class="mode-button" data-mode="wallet" role="tab" aria-selected="false" aria-controls="wallet" data-i18n="tabWallet">Carteira</button>
       </div>
       <div class="asset-search" id="asset-search-root">
         <button id="search-toggle" class="search-toggle" type="button"
-          aria-label="Buscar ativo" aria-expanded="false" aria-controls="search-panel">
+          data-i18n-aria="searchAria" aria-label="Buscar ativo" aria-expanded="false" aria-controls="search-panel">
           <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/>
             <path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </button>
         <div id="search-panel" class="search-panel">
-          <input id="asset-search" class="search-input" type="search" placeholder="Ticker ou nome — ex.: PETR4"
-            aria-label="Buscar ativo por ticker ou nome"
+          <input id="asset-search" class="search-input" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="Ticker ou nome — ex.: PETR4"
+            data-i18n-aria="searchInputAria" aria-label="Buscar ativo por ticker ou nome"
             autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false"
             aria-controls="search-results" aria-autocomplete="list">
         </div>
-        <div id="search-results" class="search-results" role="listbox" aria-label="Resultados da busca" aria-live="polite" hidden></div>
+        <div id="search-results" class="search-results" role="listbox" data-i18n-aria="searchResultsAria" aria-label="Resultados da busca" aria-live="polite" hidden></div>
       </div>
     </div>
     <p id="mode-description" class="mode-description">Top 10 maiores altas do dia</p>
   </section>
 
-  <section id="indices" class="indices reveal" aria-label="Índices de mercado"></section>
-  <section id="highlights" class="highlights reveal" aria-label="Destaques"></section>
-  <section id="wallet" class="wallet reveal" aria-label="Carteira" hidden>
+  <section id="indices" class="indices reveal" data-i18n-aria="indicesAria" aria-label="Índices de mercado"></section>
+  <section id="highlights" class="highlights reveal" data-i18n-aria="highlightsAria" aria-label="Destaques"></section>
+  <section id="wallet" class="wallet reveal" data-i18n-aria="walletAria" aria-label="Carteira" hidden>
     <div id="wallet-summary" class="wallet-summary"></div>
 
     <div class="wallet-panel">
       <form id="wallet-add-form" class="wallet-add" autocomplete="off">
         <div class="wallet-search">
-          <input id="wallet-add-input" class="wallet-input" type="text" placeholder="Ticker — ex.: PETR4"
-            aria-label="Ticker para adicionar à carteira" spellcheck="false"
+          <input id="wallet-add-input" class="wallet-input" type="text" data-i18n-placeholder="walletAddPlaceholder" placeholder="Ticker — ex.: PETR4"
+            data-i18n-aria="walletAddAria" aria-label="Ticker para adicionar à carteira" spellcheck="false"
             role="combobox" aria-expanded="false" aria-controls="wallet-suggestions" aria-autocomplete="list">
           <div id="wallet-suggestions" class="search-results wallet-suggestions" role="listbox"
-            aria-label="Sugestões de ativos" aria-live="polite" hidden></div>
+            data-i18n-aria="walletSuggestionsAria" aria-label="Sugestões de ativos" aria-live="polite" hidden></div>
         </div>
-        <button class="button button-primary" type="submit">Adicionar</button>
+        <button class="button button-primary" type="submit" data-i18n="walletAdd">Adicionar</button>
       </form>
       <div class="wallet-actions">
-        <button id="wallet-export" class="button button-ghost" type="button">Exportar</button>
-        <button id="wallet-import" class="button button-ghost" type="button">Importar</button>
-        <button id="wallet-link" class="button button-ghost" type="button">Copiar link</button>
+        <button id="wallet-export" class="button button-ghost" type="button" data-i18n="walletExport">Exportar</button>
+        <button id="wallet-import" class="button button-ghost" type="button" data-i18n="walletImport">Importar</button>
+        <button id="wallet-link" class="button button-ghost" type="button" data-i18n="walletCopyLink">Copiar link</button>
         <input id="wallet-file" type="file" accept="application/json,.json" hidden>
       </div>
     </div>
 
     <p id="wallet-status" class="wallet-status" role="status" aria-live="polite"></p>
-    <p class="scroll-hint wallet-scroll-hint">deslize a tabela →</p>
+    <p class="scroll-hint wallet-scroll-hint" data-i18n="walletScrollHint">deslize a tabela →</p>
     <div id="wallet-table-wrap" class="wallet-table-wrap table-wrap" hidden></div>
-    <p id="wallet-empty" class="wallet-empty">
+    <p id="wallet-empty" class="wallet-empty" data-i18n="walletEmpty">
       Sua carteira está vazia. Use a estrela nas tabelas de altas/baixas ou adicione um ticker acima.
     </p>
     <p class="wallet-note">
       <span class="disclaimer-icon" aria-hidden="true">i</span>
-      A carteira é salva apenas neste navegador (localStorage). Limpar os dados do site ou trocar de dispositivo apaga a lista — use <strong>Exportar</strong> para guardar um backup e <strong>Importar</strong> para restaurar.
+      <span data-i18n-html="walletNote">A carteira é salva apenas neste navegador (localStorage). Limpar os dados do site ou trocar de dispositivo apaga a lista — use <strong>Exportar</strong> para guardar um backup e <strong>Importar</strong> para restaurar.</span>
     </p>
   </section>
   <main id="groups" class="groups reveal" aria-live="polite"></main>
@@ -124,43 +132,43 @@
     <div class="project-inner">
       <div class="project-head">
         <div>
-          <p class="project-eyebrow">Projeto</p>
-          <h2 id="project-title" class="project-title">Evolução do dashboard</h2>
-          <p class="project-copy">
+          <p class="project-eyebrow" data-i18n="projectEyebrow">Projeto</p>
+          <h2 id="project-title" class="project-title" data-i18n="projectTitle">Evolução do dashboard</h2>
+          <p class="project-copy" data-i18n="projectCopy">
             Um resumo das últimas entregas. O projeto é aberto e o histórico completo,
             com todas as features e correções, fica no changelog.
           </p>
         </div>
         <div class="project-actions">
           <a class="button button-ghost" href="https://github.com/fabianoflorentino/stckcraw/blob/main/CHANGELOG.md"
-            target="_blank" rel="noopener noreferrer">Changelog (EN)</a>
+            target="_blank" rel="noopener noreferrer" data-i18n="projectChangelogEn">Changelog (EN)</a>
           <a class="button button-ghost" href="https://github.com/fabianoflorentino/stckcraw/blob/main/CHANGELOG.pt-BR.md"
-            target="_blank" rel="noopener noreferrer">Changelog (PT-BR)</a>
+            target="_blank" rel="noopener noreferrer" data-i18n="projectChangelogPt">Changelog (PT-BR)</a>
           <a class="button button-ghost" href="https://github.com/fabianoflorentino/stckcraw/commits/main"
-            target="_blank" rel="noopener noreferrer">Commits</a>
+            target="_blank" rel="noopener noreferrer" data-i18n="projectCommits">Commits</a>
         </div>
       </div>
 
       <ol class="project-timeline">
         <li>
-          <time datetime="2026-11-19">19 nov 2026</time>
-          <strong>Carteira local</strong>
-          <span>Watchlist e posições com P&amp;L, autocomplete, export/import e links compartilháveis.</span>
+          <time datetime="2026-11-19" data-i18n="projectTimeline1Date">19 nov 2026</time>
+          <strong data-i18n="projectTimeline1Title">Carteira local</strong>
+          <span data-i18n="projectTimeline1Desc">Watchlist e posições com P&amp;L, autocomplete, export/import e links compartilháveis.</span>
         </li>
         <li>
-          <time datetime="2026-11-19">19 nov 2026</time>
-          <strong>Cotações e novo visual</strong>
-          <span>Dólar, euro, ouro, Brent, Bitcoin e S&amp;P 500 no hero, switch animado e superfícies translúcidas.</span>
+          <time datetime="2026-11-19" data-i18n="projectTimeline2Date">19 nov 2026</time>
+          <strong data-i18n="projectTimeline2Title">Cotações e novo visual</strong>
+          <span data-i18n="projectTimeline2Desc">Dólar, euro, ouro, Brent, Bitcoin e S&amp;P 500 no hero, switch animado e superfícies translúcidas.</span>
         </li>
         <li>
-          <time datetime="2026-11-07">07 nov 2026</time>
-          <strong>Destaques interativos</strong>
-          <span>Maior alta, maior queda e maior volume abrem o gráfico; cobertura expande as categorias.</span>
+          <time datetime="2026-11-07" data-i18n="projectTimeline3Date">07 nov 2026</time>
+          <strong data-i18n="projectTimeline3Title">Destaques interativos</strong>
+          <span data-i18n="projectTimeline3Desc">Maior alta, maior queda e maior volume abrem o gráfico; cobertura expande as categorias.</span>
         </li>
         <li>
-          <time datetime="2026-11-03">03 nov 2026</time>
-          <strong>Gráficos e busca</strong>
-          <span>Histórico diário de um mês para índices e ativos, busca em toda a B3 e modal mais fluido.</span>
+          <time datetime="2026-11-03" data-i18n="projectTimeline4Date">03 nov 2026</time>
+          <strong data-i18n="projectTimeline4Title">Gráficos e busca</strong>
+          <span data-i18n="projectTimeline4Desc">Histórico diário de um mês para índices e ativos, busca em toda a B3 e modal mais fluido.</span>
         </li>
       </ol>
     </div>
@@ -171,10 +179,10 @@
       <img src="favicon.svg" alt="" width="20" height="20" aria-hidden="true">
       stckcraw
     </span>
-    <span>Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a> + <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer">Yahoo Finance</a> · atualizações a cada 30 min em dias úteis (10h–18h)</span>
+    <span data-i18n-html="footerSource">Fonte: <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer">brapi.dev</a> + <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer">Yahoo Finance</a> · atualizações a cada 30 min em dias úteis (10h–18h)</span>
   </footer>
 
-  <button id="back-to-top" class="back-to-top" type="button" aria-label="Voltar ao topo" tabindex="-1">
+  <button id="back-to-top" class="back-to-top" type="button" data-i18n-aria="backToTop" aria-label="Voltar ao topo" tabindex="-1">
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M12 19V6M6 12l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
@@ -185,33 +193,34 @@
     <form id="wallet-edit-form" class="wallet-form">
       <div class="wallet-form-head">
         <div>
-          <p class="chart-eyebrow">Carteira</p>
+          <p class="chart-eyebrow" data-i18n="walletDialogEyebrow">Carteira</p>
           <h2 id="wallet-edit-title" class="chart-title">Editar ativo</h2>
           <p id="wallet-edit-symbol" class="wallet-form-symbol"></p>
         </div>
-        <button id="wallet-edit-close" class="chart-close" type="button" aria-label="Fechar">×</button>
+        <button id="wallet-edit-close" class="chart-close" type="button" data-i18n-aria="walletDialogClose" aria-label="Fechar">×</button>
       </div>
 
       <label class="wallet-field">
-        <span>Quantidade</span>
+        <span data-i18n="walletQuantity">Quantidade</span>
         <input id="wallet-edit-quantity" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
       </label>
       <label class="wallet-field">
-        <span>Preço médio (R$)</span>
-        <input id="wallet-edit-average" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+        <span data-i18n="walletAverage">Preço médio (R$)</span>
+        <input id="wallet-edit-average" type="text" inputmode="decimal" data-i18n-placeholder="walletAveragePlaceholder" placeholder="0,00" autocomplete="off">
       </label>
-      <p class="wallet-form-hint">Deixe os dois campos vazios para manter o ativo apenas na watchlist.</p>
+      <p class="wallet-form-hint" data-i18n="walletFormHint">Deixe os dois campos vazios para manter o ativo apenas na watchlist.</p>
       <p id="wallet-edit-error" class="wallet-form-error" role="alert" hidden></p>
 
       <div class="wallet-form-actions">
-        <button id="wallet-edit-cancel" class="button button-ghost" type="button">Cancelar</button>
-        <button class="button button-primary" type="submit">Salvar</button>
+        <button id="wallet-edit-cancel" class="button button-ghost" type="button" data-i18n="walletCancel">Cancelar</button>
+        <button class="button button-primary" type="submit" data-i18n="walletSave">Salvar</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
-  <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=36"></script>
+  <noscript>Ative o JavaScript para visualizar o dashboard. / Enable JavaScript to view the dashboard.</noscript>
+  <script src="i18n.js?v=1"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>

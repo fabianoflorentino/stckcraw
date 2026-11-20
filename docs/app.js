@@ -14,6 +14,8 @@ const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
 const STABLE_CHANGE_THRESHOLD = 0.1;
 const WALLET_KEY = "stckcraw:wallet";
 const MODE_KEY = "stckcraw:mode";
+const LANG_KEY = "stckcraw:lang";
+const I18N = window.STCKCRAWL_I18N || { "pt-BR": {} };
 const WALLET_QUOTE_MS = 5 * 60 * 1000;
 const WALLET_SYMBOL_PATTERN = /^[A-Z0-9]{4,12}$/;
 
@@ -35,6 +37,7 @@ const backToTopEl = document.getElementById("back-to-top");
 const chartDialogEl = document.getElementById("index-chart");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
 const modeSwitchEl = document.querySelector(".mode-switch");
+const langToggleEl = document.getElementById("lang-toggle");
 const modeDescriptionEl = document.getElementById("mode-description");
 const assetSearchEl = document.querySelector(".asset-search");
 const searchToggleEl = document.getElementById("search-toggle");
@@ -65,58 +68,174 @@ const walletSuggestionsEl = document.getElementById("wallet-suggestions");
 
 const MODES = {
   highs: {
-    topLabel: "Maior alta",
-    coverage: "altas",
+    topKey: "highlightGain",
+    descToday: "modeDescGainersToday",
+    descLast: "modeDescGainersLast",
   },
   lows: {
-    topLabel: "Maior queda",
-    coverage: "baixas",
+    topKey: "highlightLoss",
+    descToday: "modeDescLosersToday",
+    descLast: "modeDescLosersLast",
   },
   wallet: {
-    topLabel: "Carteira",
-    coverage: "carteira",
+    topKey: "",
+    descToday: "",
+    descLast: "",
   },
 };
 
-const money = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+let currentLang = detectLanguage();
+let currentLocale = currentLang;
+let money;
+let usd;
+let compact;
+let points;
+let quantity;
+let percent;
 
-const usd = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+function detectLanguage() {
+  try {
+    const saved = window.localStorage.getItem(LANG_KEY);
+    if (saved === "pt-BR" || saved === "en-US") {
+      return saved;
+    }
+  } catch {
+    // Storage may be unavailable in private mode.
+  }
+  return "pt-BR";
+}
 
-const compact = new Intl.NumberFormat("pt-BR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+function buildFormatters() {
+  money = new Intl.NumberFormat(currentLocale, {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  usd = new Intl.NumberFormat(currentLocale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  compact = new Intl.NumberFormat(currentLocale, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+  points = new Intl.NumberFormat(currentLocale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  quantity = new Intl.NumberFormat(currentLocale, {
+    maximumFractionDigits: 8,
+  });
+  percent = new Intl.NumberFormat(currentLocale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    signDisplay: "exceptZero",
+  });
+}
 
-const points = new Intl.NumberFormat("pt-BR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+buildFormatters();
 
-const quantity = new Intl.NumberFormat("pt-BR", {
-  maximumFractionDigits: 8,
-});
+function t(key, vars) {
+  const dict = I18N[currentLang] || I18N["pt-BR"] || {};
+  let text = dict[key] ?? key;
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) {
+      text = text.replaceAll(`{${name}}`, String(value));
+    }
+  }
+  return text;
+}
 
-const percent = new Intl.NumberFormat("pt-BR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  signDisplay: "exceptZero",
-});
+function saveLanguage() {
+  try {
+    window.localStorage.setItem(LANG_KEY, currentLang);
+  } catch {
+    // Storage may be unavailable in private mode.
+  }
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = currentLocale;
+  document.title = t("metaTitle");
+
+  const metaDescription = document.getElementById("meta-description");
+  if (metaDescription) {
+    metaDescription.setAttribute("content", t("metaDescription"));
+  }
+
+  for (const node of document.querySelectorAll("[data-i18n]")) {
+    node.textContent = t(node.dataset.i18n);
+  }
+  for (const node of document.querySelectorAll("[data-i18n-html]")) {
+    node.innerHTML = t(node.dataset.i18nHtml);
+  }
+  for (const node of document.querySelectorAll("[data-i18n-placeholder]")) {
+    node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
+  }
+  for (const node of document.querySelectorAll("[data-i18n-aria]")) {
+    node.setAttribute("aria-label", t(node.dataset.i18nAria));
+  }
+  for (const node of document.querySelectorAll("[data-i18n-title]")) {
+    node.setAttribute("title", t(node.dataset.i18nTitle));
+  }
+
+  if (langToggleEl) {
+    const isPortuguese = currentLang === "pt-BR";
+    langToggleEl.dataset.lang = isPortuguese ? "pt-br" : "en";
+    langToggleEl.setAttribute("aria-checked", String(isPortuguese));
+    langToggleEl.setAttribute("aria-label", t("language"));
+  }
+}
+
+function setLanguage(lang) {
+  const next = lang === "en-US" ? "en-US" : "pt-BR";
+  if (next === currentLang) {
+    return;
+  }
+
+  currentLang = next;
+  currentLocale = next;
+  saveLanguage();
+  buildFormatters();
+  applyStaticTranslations();
+  setLoading(loading);
+
+  searchItems = [];
+  activeSearchIndex = -1;
+  searchCache.clear();
+  hideSearchResults();
+  walletSearchItems = [];
+  walletSearchIndex = -1;
+  walletSearchCache.clear();
+  hideWalletSuggestions();
+  setWalletStatus("");
+
+  if (lastSnapshot) {
+    renderIndices(lastSnapshot.indices || []);
+    renderActiveGroups();
+    updateStatus(lastSnapshot);
+  } else {
+    statusEl.textContent = t("statusLoading");
+    modeDescriptionEl.textContent = modeDescription(activeMode);
+    if (activeMode === "wallet") {
+      renderActiveGroups();
+    }
+  }
+
+  if (chartDialogEl?.open && activeChartData) {
+    renderChart(activeChartData);
+  }
+}
 
 let loading = false;
 let lastSnapshot = null;
 let toastTimer = null;
 let activeMode = "highs";
 let activeChartKey = null;
+let activeChartData = null;
 let lastChartTrigger = null;
 let chartCloseTimer = null;
 let chartCloseHandler = null;
@@ -213,7 +332,7 @@ function formatDate(value) {
   if (Number.isNaN(date.getTime())) {
     return value || "—";
   }
-  return date.toLocaleString("pt-BR", {
+  return date.toLocaleString(currentLocale, {
     dateStyle: "short",
     timeStyle: "short",
   });
@@ -226,14 +345,14 @@ function formatB3SessionDate(value) {
   }
 
   try {
-    return new Intl.DateTimeFormat("pt-BR", {
+    return new Intl.DateTimeFormat(currentLocale, {
       timeZone: "America/Sao_Paulo",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     }).format(date);
   } catch {
-    return date.toLocaleDateString("pt-BR");
+    return date.toLocaleDateString(currentLocale);
   }
 }
 
@@ -253,9 +372,9 @@ function formatIndexChartDate(value, timezone, withYear = false) {
   }
 
   try {
-    return new Intl.DateTimeFormat("pt-BR", options).format(date);
+    return new Intl.DateTimeFormat(currentLocale, options).format(date);
   } catch {
-    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    return date.toLocaleDateString(currentLocale, { day: "2-digit", month: "2-digit" });
   }
 }
 
@@ -354,7 +473,8 @@ function buildIndexChart(points, index, change) {
   const lastPoint = points[lastIndex];
   const lastX = scale.x(lastIndex);
   const lastY = scale.y(lastPoint.close);
-  const title = `Fechamentos diários de ${index.label || index.key} no último mês`;
+  const chartName = INDEX_LABEL_KEYS[index.key] ? indexLabel(index) : (index.label || index.key);
+  const title = t("chartAriaTitle", { name: chartName });
 
   return `<svg class="index-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(title)}"><title>${escapeHTML(title)}</title>${grid.join("")}<path class="chart-area ${tone}" d="${area}"/><path class="chart-line ${tone}" d="${line}"/><circle class="chart-dot ${tone}" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"/>${dateLabels.join("")}</svg>`;
 }
@@ -380,6 +500,7 @@ function renderChart(index) {
     return;
   }
 
+  activeChartData = index;
   const points = indexChartPoints(index);
   const hadFocus = chartDialogEl.contains(document.activeElement);
   const content = document.createElement("div");
@@ -391,14 +512,14 @@ function renderChart(index) {
   const titleWrap = document.createElement("div");
   const eyebrow = document.createElement("p");
   eyebrow.className = "chart-eyebrow";
-  eyebrow.textContent = "Histórico diário · 1 mês";
+  eyebrow.textContent = t("chartEyebrow");
 
   const titleRow = document.createElement("div");
   titleRow.className = "chart-title-row";
   const title = document.createElement("h2");
   title.id = "index-chart-title";
   title.className = "chart-title";
-  title.textContent = index.label || index.key;
+  title.textContent = INDEX_LABEL_KEYS[index.key] ? indexLabel(index) : (index.label || index.key);
   titleRow.appendChild(title);
 
   if (index.symbol) {
@@ -413,7 +534,7 @@ function renderChart(index) {
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.className = "chart-close";
-  closeButton.setAttribute("aria-label", "Fechar gráfico");
+  closeButton.setAttribute("aria-label", t("chartClose"));
   closeButton.textContent = "×";
   closeButton.addEventListener("click", closeChart);
 
@@ -423,7 +544,7 @@ function renderChart(index) {
   if (index.loading) {
     const loading = document.createElement("p");
     loading.className = "chart-empty chart-loading";
-    loading.textContent = "Carregando histórico diário…";
+    loading.textContent = t("chartLoading");
     content.appendChild(loading);
     chartDialogEl.replaceChildren(content);
     if (hadFocus) {
@@ -436,10 +557,10 @@ function renderChart(index) {
     const empty = document.createElement("p");
     empty.className = "chart-empty";
     empty.textContent = index.error
-      ? `Dados indisponíveis: ${index.error}`
+      ? t("chartDataUnavailable", { error: index.error })
       : index.historyError
-        ? `Histórico indisponível: ${index.historyError}`
-        : "Histórico diário indisponível para este item.";
+        ? t("chartHistoryUnavailable", { error: index.historyError })
+        : t("chartNoHistory");
     content.appendChild(empty);
     chartDialogEl.replaceChildren(content);
     if (hadFocus) {
@@ -454,11 +575,11 @@ function renderChart(index) {
   const summary = document.createElement("div");
   summary.className = "chart-summary";
   summary.append(
-    chartStat("Último", formatPoints(index.price)),
-    chartStat("Variação do dia", formatPercent(index.change), changeTone(index.change)),
-    chartStat("No período", formatPercent(change), changeTone(change)),
-    chartStat("Mínimo", formatPoints(Math.min(...closes))),
-    chartStat("Máximo", formatPoints(Math.max(...closes))),
+    chartStat(t("chartLast"), formatPoints(index.price)),
+    chartStat(t("chartDayChange"), formatPercent(index.change), changeTone(index.change)),
+    chartStat(t("chartPeriodChange"), formatPercent(change), changeTone(change)),
+    chartStat(t("chartMin"), formatPoints(Math.min(...closes))),
+    chartStat(t("chartMax"), formatPoints(Math.max(...closes))),
   );
 
   const canvas = document.createElement("div");
@@ -467,7 +588,7 @@ function renderChart(index) {
 
   const note = document.createElement("p");
   note.className = "chart-note";
-  note.textContent = `Fechamentos diários · último ponto em ${formatIndexChartDate(lastPoint.date, index.timezone, true)} · Yahoo Finance`;
+  note.textContent = t("chartNote", { date: formatIndexChartDate(lastPoint.date, index.timezone, true) });
 
   content.append(summary, canvas, note);
   chartDialogEl.replaceChildren(content);
@@ -571,16 +692,48 @@ function closeChart() {
   chartCloseTimer = window.setTimeout(finish, 500);
 }
 
+const GROUP_LABEL_KEYS = {
+  acoes: "groupStocks",
+  fii: "groupREITs",
+  fip: "groupFIPs",
+  etf: "groupETFs",
+  bdr: "groupBDRs",
+  unit: "groupUnits",
+};
+
+const INDEX_LABEL_KEYS = {
+  ibovespa: "indexIbovespa",
+  nasdaq: "indexNasdaq",
+  stoxx50: "indexStoxx",
+  shanghai: "indexShanghai",
+  dolar: "indexDollar",
+  euro: "indexEuro",
+  ouro: "indexGold",
+  brent: "indexBrent",
+  bitcoin: "indexBitcoin",
+  sp500: "indexSp500",
+};
+
+function groupLabel(group) {
+  const key = GROUP_LABEL_KEYS[group?.key];
+  return key ? t(key) : (group?.label || group?.key || "");
+}
+
+function indexLabel(index) {
+  const key = INDEX_LABEL_KEYS[index?.key];
+  return key ? t(key) : (index?.label || index?.key || "");
+}
+
 function assetTypeLabel(asset) {
   const type = String(asset.type || "").toLowerCase();
   const subType = String(asset.subType || "").toLowerCase();
-  if (subType === "fii") return "FII";
-  if (subType === "fip") return "FIP";
-  if (subType === "etf") return "ETF";
-  if (subType === "unit") return "Unit";
-  if (type === "bdr") return "BDR";
-  if (type === "fund") return "Fundo";
-  return "Ação";
+  if (subType === "fii") return t("typeREIT");
+  if (subType === "fip") return t("typeFIP");
+  if (subType === "etf") return t("typeETF");
+  if (subType === "unit") return t("typeUnit");
+  if (type === "bdr") return t("typeBDR");
+  if (type === "fund") return t("typeFund");
+  return t("typeStock");
 }
 
 function searchResultItem(asset) {
@@ -618,7 +771,7 @@ async function fetchAssetHistory(symbol) {
   }
   const payload = await response.json();
   if (!Array.isArray(payload.points)) {
-    throw new Error("resposta inesperada");
+    throw new Error(t("unexpectedResponse"));
   }
   return payload.points;
 }
@@ -725,7 +878,7 @@ function renderSearchResults(items, query) {
   searchResultsEl.replaceChildren();
 
   if (items.length === 0) {
-    showSearchMessage(`Nenhum ativo encontrado para “${query}”.`);
+    showSearchMessage(t("searchEmpty", { query }));
     return;
   }
 
@@ -768,7 +921,7 @@ async function runSearch(query) {
     searchController?.abort();
     searchController = new AbortController();
   }
-  showSearchMessage("Buscando ativos…");
+  showSearchMessage(t("searchingAssets"));
 
   try {
     const params = new URLSearchParams({
@@ -804,7 +957,7 @@ async function runSearch(query) {
       return;
     }
     if (query.toLowerCase() === searchInputEl.value.trim().toLowerCase()) {
-      showSearchMessage(`Busca indisponível: ${error.message}`);
+      showSearchMessage(t("searchUnavailable", { error: error.message }));
     }
   }
 }
@@ -838,13 +991,14 @@ function relativeTime(value) {
   }
   const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
   if (minutes < 1) {
-    return "agora";
+    return t("justNow");
   }
+  const relative = new Intl.RelativeTimeFormat(currentLocale, { numeric: "auto" });
   if (minutes < 60) {
-    return `há ${minutes} min`;
+    return relative.format(-minutes, "minute");
   }
   const hours = Math.floor(minutes / 60);
-  return `há ${hours} h`;
+  return relative.format(-hours, "hour");
 }
 
 function changeTone(value) {
@@ -866,8 +1020,8 @@ function setLoading(isLoading) {
   refreshEl.disabled = isLoading;
   refreshEl.classList.toggle("loading", isLoading);
   refreshEl.querySelector(".button-label").textContent = isLoading
-    ? "Atualizando…"
-    : "Atualizar";
+    ? t("refreshingLabel")
+    : t("refresh");
   groupsEl.setAttribute("aria-busy", String(isLoading));
 }
 
@@ -883,10 +1037,14 @@ function showToast(message, tone) {
 function updateStatus(snapshot) {
   const generated = snapshot.generatedAt;
   const relative = relativeTime(generated);
-  const b3Note = snapshot.b3Closed && snapshot.b3AsOf
-    ? ` · B3 fechada · último pregão ${formatB3SessionDate(snapshot.b3AsOf)}`
-    : "";
-  statusEl.textContent = `Atualizado ${formatDate(generated)}${relative ? ` · ${relative}` : ""}${b3Note}`;
+  let text = t("statusUpdated", { time: formatDate(generated) });
+  if (relative) {
+    text += ` · ${relative}`;
+  }
+  if (snapshot.b3Closed && snapshot.b3AsOf) {
+    text += t("statusB3Closed", { date: formatB3SessionDate(snapshot.b3AsOf) });
+  }
+  statusEl.textContent = text;
   statusEl.classList.remove("error");
 }
 
@@ -926,11 +1084,11 @@ function highlightCard(label, value, meta, tone, options = {}) {
 function formatIndexTime(index) {
   const date = new Date(index.asOf);
   if (Number.isNaN(date.getTime())) {
-    return "último dado indisponível";
+    return t("lastDataUnavailable");
   }
 
   try {
-    return new Intl.DateTimeFormat("pt-BR", {
+    return new Intl.DateTimeFormat(currentLocale, {
       timeZone: index.timezone || "America/Sao_Paulo",
       day: "2-digit",
       month: "2-digit",
@@ -953,14 +1111,15 @@ function renderIndexCard(index, position) {
   }
 
   const tone = index.error ? "neutral" : changeTone(index.change);
+  const label = indexLabel(index);
   const value = index.error ? "—" : formatPoints(index.price);
-  const change = index.error ? "indisponível" : formatPercent(index.change);
+  const change = index.error ? t("indexUnavailable") : formatPercent(index.change);
   const meta = index.error || formatIndexTime(index);
   const chartPoints = indexChartPoints(index);
 
   card.innerHTML = `
     <div class="index-head">
-      <span class="index-label">${escapeHTML(index.label || index.key)}</span>
+      <span class="index-label">${escapeHTML(label)}</span>
       <span class="index-symbol">${escapeHTML(index.symbol || "")}</span>
     </div>
     <strong class="index-value">${escapeHTML(value)}</strong>
@@ -974,10 +1133,10 @@ function renderIndexCard(index, position) {
     card.appendChild(spark);
     card.classList.add("interactive");
     card.tabIndex = 0;
-    card.title = "Clique para ver o gráfico diário";
+    card.title = t("openChartTitle");
     card.setAttribute("role", "button");
     card.setAttribute("aria-haspopup", "dialog");
-    card.setAttribute("aria-label", `Abrir gráfico diário de ${index.label || index.key}`);
+    card.setAttribute("aria-label", t("openChartAria", { symbol: label }));
     card.addEventListener("click", () => openChart(index, card));
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -993,10 +1152,11 @@ function renderIndexCard(index, position) {
 function renderQuotePill(index) {
   const pill = document.createElement("article");
   const tone = index.error ? "neutral" : quoteTone(index.change);
-  const label = index.unit ? `${index.label || index.key} ${index.unit}` : (index.label || index.key);
+  const name = indexLabel(index);
+  const label = index.unit ? `${name} ${index.unit}` : name;
   pill.className = `ticker-pill ${tone}`;
   pill.title = index.error
-    ? `Dados indisponíveis para ${index.label || index.key}`
+    ? t("quoteUnavailableTitle", { name })
     : [label, index.symbol, formatIndexTime(index)]
       .filter(Boolean)
       .join(" · ");
@@ -1060,7 +1220,7 @@ function renderHighlights(groups, mode) {
   const items = [];
   for (const group of groups) {
     for (const item of group.items || []) {
-      items.push({ ...item, group: group.label || group.key });
+      items.push({ ...item, group: groupLabel(group) });
     }
   }
 
@@ -1087,8 +1247,8 @@ function renderHighlights(groups, mode) {
       action: "open-chart",
       haspopup: "dialog",
       chartKey: `asset:${topChange.symbol}`,
-      title: "Clique para ver o gráfico diário",
-      ariaLabel: `Abrir gráfico diário de ${topChange.symbol}`,
+      title: t("openChartTitle"),
+      ariaLabel: t("openChartAria", { symbol: topChange.symbol }),
       onClick: (card) => openChart(assetChart(topChange), card),
     }
     : {};
@@ -1097,41 +1257,44 @@ function renderHighlights(groups, mode) {
       action: "open-chart",
       haspopup: "dialog",
       chartKey: `asset:${topVolume.symbol}`,
-      title: "Clique para ver o gráfico diário",
-      ariaLabel: `Abrir gráfico diário de ${topVolume.symbol}`,
+      title: t("openChartTitle"),
+      ariaLabel: t("openChartAria", { symbol: topVolume.symbol }),
       onClick: (card) => openChart(assetChart(topVolume), card),
     }
     : {};
 
   highlightsEl.replaceChildren(
     highlightCard(
-      config.topLabel,
+      t(config.topKey),
       topChange ? topChange.symbol : "—",
       topChange
         ? `${topChange.group} · ${formatPercent(topChange.change)}`
-        : "sem dados",
+        : t("highlightNoData"),
       topChange ? changeTone(topChange.change) : "neutral",
       topChangeOptions,
     ),
     highlightCard(
-      "Maior volume",
+      t("highlightVolume"),
       topVolume ? topVolume.symbol : "—",
       topVolume
         ? `${topVolume.group} · ${formatCompact(topVolume.financialVolume)}`
-        : "sem dados",
+        : t("highlightNoData"),
       "neutral",
       topVolumeOptions,
     ),
     highlightCard(
-      "Cobertura",
-      `${items.length} ativos`,
-      `${groups.length} grupos · ${allCollapsed ? "expandir" : "recolher"} categorias`,
+      t("highlightCoverage"),
+      t("highlightAssetsCount", { count: items.length }),
+      t("coverageMeta", {
+        groups: groups.length,
+        action: allCollapsed ? t("coverageExpand") : t("coverageCollapse"),
+      }),
       "neutral",
       collapsibleGroups.length > 0
         ? {
           action: "toggle-groups",
-          title: allCollapsed ? "Expandir todas as categorias" : "Recolher todas as categorias",
-          ariaLabel: `${allCollapsed ? "Expandir" : "Recolher"} todas as categorias de ativos`,
+          title: allCollapsed ? t("toggleGroupsExpand") : t("toggleGroupsCollapse"),
+          ariaLabel: allCollapsed ? t("toggleGroupsAriaExpand") : t("toggleGroupsAriaCollapse"),
           onClick: () => toggleAllGroups(groups),
         }
         : {},
@@ -1196,13 +1359,13 @@ function buildTable(items) {
   thead.innerHTML = `
     <tr>
       <th>#</th>
-      <th>Ativo</th>
-      <th>Gráfico</th>
-      <th>Último</th>
-      <th>Var. dia</th>
-      <th>Volume (R$)</th>
-      <th>Market cap</th>
-      <th>Setor</th>
+      <th>${escapeHTML(t("colAsset"))}</th>
+      <th>${escapeHTML(t("colChart"))}</th>
+      <th>${escapeHTML(t("colLast"))}</th>
+      <th>${escapeHTML(t("colDayChange"))}</th>
+      <th>${escapeHTML(t("colVolume"))}</th>
+      <th>${escapeHTML(t("colMarketCap"))}</th>
+      <th>${escapeHTML(t("colSector"))}</th>
     </tr>`;
   table.appendChild(thead);
 
@@ -1217,19 +1380,19 @@ function buildTable(items) {
     const chartPoints = indexChartPoints(item);
     const inWallet = isInWallet(item.symbol);
     const chartButton = chartPoints.length >= 2
-      ? `<button type="button" class="spark-button" data-chart-key="asset:${escapeHTML(item.symbol)}" aria-label="Abrir gráfico diário de ${escapeHTML(item.symbol)}" title="Ver gráfico diário">${buildSparkline(chartPoints, changeTone(periodChange(chartPoints)))}</button>`
+      ? `<button type="button" class="spark-button" data-chart-key="asset:${escapeHTML(item.symbol)}" aria-label="${escapeHTML(t("openChartAria", { symbol: item.symbol }))}" title="${escapeHTML(t("openChartTitle"))}">${buildSparkline(chartPoints, changeTone(periodChange(chartPoints)))}</button>`
       : '<span class="chart-na">—</span>';
 
     const row = document.createElement("tr");
     row.className = "asset-row";
     row.title = chartPoints.length >= 2
-      ? "Clique para ver o gráfico diário"
-      : "Histórico diário indisponível para este ativo";
+      ? t("rowChartTitle")
+      : t("rowChartUnavailable");
     row.innerHTML = `
       <td><span class="rank${rankClass}">${escapeHTML(item.rank)}</span></td>
       <td>
         <span class="asset-cell">
-          <button type="button" class="wallet-star" data-symbol="${escapeHTML(item.symbol)}" data-name="${escapeHTML(item.name)}" aria-pressed="${inWallet}" aria-label="${inWallet ? "Remover" : "Adicionar"} ${escapeHTML(item.symbol)} ${inWallet ? "da" : "à"} carteira">${inWallet ? "★" : "☆"}</button>
+          <button type="button" class="wallet-star" data-symbol="${escapeHTML(item.symbol)}" data-name="${escapeHTML(item.name)}" aria-pressed="${inWallet}" title="${escapeHTML(inWallet ? t("rowStarRemove", { name: item.name || item.symbol }) : t("rowStarAdd", { name: item.name || item.symbol }))}" aria-label="${escapeHTML(inWallet ? t("rowStarRemove", { name: item.name || item.symbol }) : t("rowStarAdd", { name: item.name || item.symbol }))}">${inWallet ? "★" : "☆"}</button>
           <span class="asset-id">
             <span class="symbol">${escapeHTML(item.symbol)}</span>
             <span class="asset-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
@@ -1279,9 +1442,10 @@ function renderGroup(group, index) {
 
   const items = Array.isArray(group.items) ? group.items : [];
   const leader = items[0];
-  const label = group.label || group.key;
+  const label = groupLabel(group);
   const collapsed = collapsedGroups.has(group.key);
   const bodyId = `group-body-${group.key}`;
+  const ariaKey = collapsed ? "groupExpandAria" : "groupCollapseAria";
 
   if (collapsed) {
     section.classList.add("collapsed");
@@ -1292,16 +1456,19 @@ function renderGroup(group, index) {
   head.className = "group-head";
   head.setAttribute("aria-controls", bodyId);
   head.setAttribute("aria-expanded", String(!collapsed));
-  head.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${label} (${items.length} ativos)`);
+  head.setAttribute("aria-label", t(ariaKey, { label, count: items.length }));
   head.innerHTML = `
     <span class="group-title">${escapeHTML(label)}</span>
-    <span class="group-count">${items.length} ativos</span>
-    <span class="scroll-hint">deslize a tabela →</span>`;
+    <span class="group-count">${escapeHTML(t("groupCount", { count: items.length }))}</span>
+    <span class="scroll-hint">${escapeHTML(t("groupScrollHint"))}</span>`;
 
   if (leader) {
     const leaderEl = document.createElement("span");
     leaderEl.className = "group-leader";
-    leaderEl.innerHTML = `#1 <strong>${escapeHTML(leader.symbol)}</strong> ${formatPercent(leader.change)}`;
+    leaderEl.innerHTML = t("groupLeader", {
+      symbol: `<strong>${escapeHTML(leader.symbol)}</strong>`,
+      change: formatPercent(leader.change),
+    });
     head.appendChild(leaderEl);
   }
 
@@ -1323,7 +1490,7 @@ function renderGroup(group, index) {
   head.addEventListener("click", () => {
     const isCollapsed = section.classList.toggle("collapsed");
     head.setAttribute("aria-expanded", String(!isCollapsed));
-    head.setAttribute("aria-label", `${isCollapsed ? "Expandir" : "Recolher"} ${label} (${items.length} ativos)`);
+    head.setAttribute("aria-label", t(isCollapsed ? "groupExpandAria" : "groupCollapseAria", { label, count: items.length }));
     body.setAttribute("aria-hidden", String(isCollapsed));
     setCollapsed(group.key, isCollapsed);
   });
@@ -1336,7 +1503,7 @@ function renderGroup(group, index) {
   } else if (items.length === 0) {
     const message = document.createElement("p");
     message.className = "empty";
-    message.textContent = "Sem dados para este filtro.";
+    message.textContent = t("groupEmpty");
     inner.appendChild(message);
   } else {
     const wrap = document.createElement("div");
@@ -1541,7 +1708,7 @@ async function fetchWorkerWalletQuote(symbol) {
   const payload = await response.json();
   const price = Number(payload.price);
   if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("cotação indisponível");
+    throw new Error(t("quoteUnavailableError"));
   }
 
   return {
@@ -1572,7 +1739,7 @@ async function fetchBrapiWalletQuote(symbol) {
     .find((asset) => normalizeWalletSymbol(asset.stock) === symbol);
   const price = Number(match?.close);
   if (!match || !Number.isFinite(price) || price <= 0) {
-    throw new Error("cotação indisponível");
+    throw new Error(t("quoteUnavailableError"));
   }
 
   return {
@@ -1613,7 +1780,7 @@ function walletQuoteIsFresh(symbol) {
 async function hydrateWalletEntry(symbol) {
   const entry = findWalletEntry(symbol);
   if (!entry) {
-    throw new Error("ativo não encontrado na carteira");
+    throw new Error(t("walletEntryNotFound"));
   }
 
   const quote = await requestWalletQuote(symbol);
@@ -1657,7 +1824,9 @@ function updateWalletStar(star, symbol) {
   const inWallet = isInWallet(symbol);
   const name = star.dataset.name || symbol;
   star.setAttribute("aria-pressed", String(inWallet));
-  star.setAttribute("aria-label", `${inWallet ? "Remover" : "Adicionar"} ${name} ${inWallet ? "da" : "à"} carteira`);
+  const label = t(inWallet ? "rowStarRemove" : "rowStarAdd", { name });
+  star.setAttribute("aria-label", label);
+  star.setAttribute("title", label);
   star.textContent = inWallet ? "★" : "☆";
 }
 
@@ -1717,16 +1886,16 @@ function walletTable(rows) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Ativo</th>
-        <th>Último</th>
-        <th>Var. dia</th>
-        <th>Qtd.</th>
-        <th>Preço médio</th>
-        <th>Investido</th>
-        <th>Valor atual</th>
-        <th>Resultado</th>
-        <th>Peso</th>
-        <th>Ações</th>
+        <th>${escapeHTML(t("colAsset"))}</th>
+        <th>${escapeHTML(t("colLast"))}</th>
+        <th>${escapeHTML(t("colDayChange"))}</th>
+        <th>${escapeHTML(t("walletColQuantity"))}</th>
+        <th>${escapeHTML(t("walletColAverage"))}</th>
+        <th>${escapeHTML(t("walletColInvested"))}</th>
+        <th>${escapeHTML(t("walletColCurrent"))}</th>
+        <th>${escapeHTML(t("walletColResult"))}</th>
+        <th>${escapeHTML(t("walletColWeight"))}</th>
+        <th>${escapeHTML(t("walletColActions"))}</th>
       </tr>
     </thead>`;
 
@@ -1750,13 +1919,11 @@ function walletTable(rows) {
     const tr = document.createElement("tr");
     tr.className = "wallet-row asset-row";
     tr.dataset.symbol = entry.symbol;
-    tr.title = quote
-      ? `Clique para ver o gráfico diário${quoteTime}`
-      : "Clique para ver o gráfico diário";
+    tr.title = quote ? `${t("rowChartTitle")}${quoteTime}` : t("rowChartTitle");
     tr.innerHTML = `
       <td>
         <span class="asset-cell">
-          <button type="button" class="wallet-star" data-symbol="${escapeHTML(entry.symbol)}" data-name="${escapeHTML(entry.name)}" aria-pressed="true" aria-label="Remover ${escapeHTML(entry.symbol)} da carteira">★</button>
+          <button type="button" class="wallet-star" data-symbol="${escapeHTML(entry.symbol)}" data-name="${escapeHTML(entry.name)}" aria-pressed="true" title="${escapeHTML(t("rowStarRemove", { name: entry.name || entry.symbol }))}" aria-label="${escapeHTML(t("rowStarRemove", { name: entry.name || entry.symbol }))}">★</button>
           <span class="asset-id">
             <span class="symbol">${escapeHTML(entry.symbol)}</span>
             <span class="asset-name" title="${escapeHTML(entry.name || entry.symbol)}">${escapeHTML(entry.name || "—")}</span>
@@ -1776,8 +1943,8 @@ function walletTable(rows) {
       <td>${escapeHTML(weightText)}</td>
       <td>
         <span class="wallet-row-actions">
-          <button type="button" class="wallet-edit" data-symbol="${escapeHTML(entry.symbol)}">Editar</button>
-          <button type="button" class="wallet-remove" data-symbol="${escapeHTML(entry.symbol)}">Remover</button>
+          <button type="button" class="wallet-edit" data-symbol="${escapeHTML(entry.symbol)}">${escapeHTML(t("walletEdit"))}</button>
+          <button type="button" class="wallet-remove" data-symbol="${escapeHTML(entry.symbol)}">${escapeHTML(t("walletRemove"))}</button>
         </span>
       </td>`;
     tbody.appendChild(tr);
@@ -1811,22 +1978,32 @@ function renderWallet() {
 
   walletSummaryEl.replaceChildren(
     walletStat(
-      "Investido",
+      t("walletInvested"),
       invested > 0 && investedComplete ? formatMoney(invested) : "—",
-      positions.length === 0 ? "nenhuma posição" : (investedComplete ? `${positions.length} ${positions.length === 1 ? "posição" : "posições"}` : "preencha o preço médio"),
+      positions.length === 0
+        ? t("walletNoPositions")
+        : (investedComplete
+          ? `${positions.length} ${t(positions.length === 1 ? "positionOne" : "positionMany")}`
+          : t("walletFillAverage")),
     ),
     walletStat(
-      "Valor atual",
+      t("walletCurrent"),
       current !== null ? formatMoney(current) : "—",
-      positions.length === 0 ? "só watchlist" : (currentComplete ? "preços mais recentes" : "aguardando cotação"),
+      positions.length === 0
+        ? t("walletWatchlistOnly")
+        : (currentComplete ? t("walletRecentPrices") : t("walletAwaitingQuote")),
     ),
     walletStat(
-      "Resultado",
+      t("walletResult"),
       pnl === null ? "—" : formatMoney(pnl),
-      pnlPercent === null ? "sem dados completos" : formatPercent(pnlPercent),
+      pnlPercent === null ? t("walletNoCompleteData") : formatPercent(pnlPercent),
       pnlTone,
     ),
-    walletStat("Ativos", String(wallet.length), `${positions.length} na carteira · ${wallet.length - positions.length} na watchlist`),
+    walletStat(
+      t("walletAssets"),
+      String(wallet.length),
+      t("walletAssetsMeta", { positions: positions.length, watchlist: wallet.length - positions.length }),
+    ),
   );
 
   const empty = wallet.length === 0;
@@ -1886,7 +2063,7 @@ function saveWalletEditor(event) {
   const averagePrice = parseWalletNumber(walletEditAverageEl.value);
 
   if (quantity > 0 && averagePrice <= 0) {
-    walletEditErrorEl.textContent = "Informe o preço médio para calcular o resultado da posição.";
+    walletEditErrorEl.textContent = t("walletErrorAverage");
     walletEditErrorEl.hidden = false;
     walletEditAverageEl.focus();
     return;
@@ -1899,8 +2076,8 @@ function saveWalletEditor(event) {
   renderWallet();
   setWalletStatus(
     entry.quantity > 0
-      ? `${entry.symbol}: posição de ${formatQuantity(entry.quantity)} @ ${formatMoney(entry.averagePrice)}.`
-      : `${entry.symbol} mantido apenas na watchlist.`,
+      ? t("walletStatusPosition", { symbol: entry.symbol, quantity: formatQuantity(entry.quantity), average: formatMoney(entry.averagePrice) })
+      : t("walletStatusWatchlist", { symbol: entry.symbol }),
     "success",
   );
 }
@@ -1911,7 +2088,7 @@ function removeWalletEntry(symbol) {
     return;
   }
 
-  if (entry.quantity > 0 && !window.confirm(`Remover ${symbol} da carteira? A posição será perdida.`)) {
+  if (entry.quantity > 0 && !window.confirm(t("walletConfirmRemove", { symbol }))) {
     return;
   }
 
@@ -1919,8 +2096,9 @@ function removeWalletEntry(symbol) {
   saveWallet();
   updateWalletStars(symbol);
   renderWallet();
-  setWalletStatus(`${symbol} removido da carteira.`, "success");
-  showToast(`${symbol} removido da carteira.`, "success");
+  const removed = t("walletStatusRemoved", { symbol });
+  setWalletStatus(removed, "success");
+  showToast(removed, "success");
 }
 
 function toggleWallet(symbol, name) {
@@ -1946,25 +2124,26 @@ function toggleWallet(symbol, name) {
   if (activeMode === "wallet") {
     renderWallet();
   }
-  setWalletStatus(`${symbol} adicionado. Use Editar para definir quantidade e preço médio.`, "success");
-  showToast(`${symbol} adicionado à carteira.`, "success");
+  const added = t("walletStatusAdded", { symbol });
+  setWalletStatus(added, "success");
+  showToast(added, "success");
   void hydrateWalletEntry(symbol).then(() => {
     if (activeMode === "wallet") {
       renderWallet();
     }
   }).catch(() => {
-    setWalletStatus(`${symbol} adicionado, mas a cotação ainda não está disponível.`, "error");
+    setWalletStatus(t("walletStatusQuoteMissing", { symbol }), "error");
   });
 }
 
 async function addWalletSymbol(raw, knownName = "") {
   const symbol = normalizeWalletSymbol(raw);
   if (!isValidWalletSymbol(symbol)) {
-    setWalletStatus("Ticker inválido. Use o formato PETR4, BOVA11 ou AAPL34.", "error");
+    setWalletStatus(t("walletStatusInvalid"), "error");
     return;
   }
   if (isInWallet(symbol)) {
-    setWalletStatus(`${symbol} já está na carteira.`, "error");
+    setWalletStatus(t("walletStatusAlready", { symbol }), "error");
     return;
   }
 
@@ -1982,14 +2161,14 @@ async function addWalletSymbol(raw, knownName = "") {
   saveWallet();
   updateWalletStars(symbol);
   renderWallet();
-  setWalletStatus(`Adicionado ${symbol}. Use Editar para definir quantidade e preço médio.`, "success");
+  setWalletStatus(t("walletStatusAdded", { symbol }), "success");
 
   if (!snapshot) {
     try {
       await hydrateWalletEntry(symbol);
       renderWallet();
     } catch {
-      setWalletStatus(`${symbol} adicionado, mas a cotação ainda não está disponível.`, "error");
+      setWalletStatus(t("walletStatusQuoteMissing", { symbol }), "error");
     }
   }
 }
@@ -2018,7 +2197,7 @@ function walletAssetsFromFile(payload) {
 
 function exportWallet() {
   if (wallet.length === 0) {
-    setWalletStatus("Adicione ativos antes de exportar.", "error");
+    setWalletStatus(t("walletExportEmpty"), "error");
     return;
   }
 
@@ -2038,19 +2217,19 @@ function exportWallet() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `stckcraw-carteira-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `${t("walletFilePrefix")}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(link);
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-  setWalletStatus(`Carteira exportada com ${assets.length} ${assets.length === 1 ? "ativo" : "ativos"}.`, "success");
+  setWalletStatus(t("walletExported", { count: assets.length, assets: t(assets.length === 1 ? "assetOne" : "assetMany") }), "success");
 }
 
 async function importWalletFile(file) {
   try {
     const entries = walletAssetsFromFile(JSON.parse(await file.text()));
     if (entries.length === 0) {
-      setWalletStatus("O arquivo não contém ativos válidos.", "error");
+      setWalletStatus(t("walletImportEmptyFile"), "error");
       return;
     }
 
@@ -2078,19 +2257,16 @@ async function importWalletFile(file) {
       updateWalletStars(entry.symbol);
     }
     renderWallet();
-    setWalletStatus(
-      `${added} ${added === 1 ? "ativo adicionado" : "ativos adicionados"} · ${updated} ${updated === 1 ? "atualizado" : "atualizados"}.`,
-      "success",
-    );
+    setWalletStatus(t("walletImportSummary", { added, updated }), "success");
     void refreshWalletQuotes();
   } catch {
-    setWalletStatus("Arquivo inválido. Selecione um JSON exportado pela carteira.", "error");
+    setWalletStatus(t("walletImportInvalid"), "error");
   }
 }
 
 async function copyWalletLink() {
   if (wallet.length === 0) {
-    setWalletStatus("Adicione ativos antes de copiar o link.", "error");
+    setWalletStatus(t("walletLinkEmpty"), "error");
     return;
   }
 
@@ -2103,10 +2279,10 @@ async function copyWalletLink() {
       throw new Error("clipboard unavailable");
     }
     await navigator.clipboard.writeText(url.toString());
-    setWalletStatus("Link copiado. Ele importa os tickers como watchlist, sem quantidades.", "success");
+    setWalletStatus(t("walletLinkCopied"), "success");
   } catch {
-    window.prompt("Copie o link da carteira:", url.toString());
-    setWalletStatus("Não foi possível copiar automaticamente; use o link exibido.", "error");
+    window.prompt(t("walletLinkPrompt"), url.toString());
+    setWalletStatus(t("walletLinkFailed"), "error");
   }
 }
 
@@ -2155,7 +2331,7 @@ function applySharedWallet() {
   saveActiveMode(activeMode);
   applyModeState();
   renderActiveGroups();
-  setWalletStatus(`${symbols.length} ${symbols.length === 1 ? "ativo importado" : "ativos importados"} do link como watchlist.`, "success");
+  setWalletStatus(t("walletLinkImported", { count: symbols.length, assets: t(symbols.length === 1 ? "assetOne" : "assetMany") }), "success");
   void refreshWalletQuotes();
 }
 
@@ -2232,7 +2408,7 @@ function renderWalletSuggestions(items, query) {
   }
 
   if (items.length === 0) {
-    showWalletSearchMessage(`Nenhum ativo encontrado para “${query}”.`);
+    showWalletSearchMessage(t("searchEmpty", { query }));
     return;
   }
 
@@ -2309,7 +2485,7 @@ async function runWalletSearch(query) {
     walletSearchController?.abort();
     walletSearchController = new AbortController();
   }
-  showWalletSearchMessage("Buscando ativos…");
+  showWalletSearchMessage(t("searchingAssets"));
 
   try {
     const params = new URLSearchParams({
@@ -2345,7 +2521,7 @@ async function runWalletSearch(query) {
       return;
     }
     if (query.toLowerCase() === walletAddInputEl.value.trim().toLowerCase()) {
-      showWalletSearchMessage(`Busca indisponível: ${error.message}`);
+      showWalletSearchMessage(t("searchUnavailable", { error: error.message }));
     }
   }
 }
@@ -2360,7 +2536,7 @@ function selectWalletSuggestion(item) {
   hideWalletSuggestions();
 
   if (isInWallet(symbol)) {
-    setWalletStatus(`${symbol} já está na carteira.`, "error");
+    setWalletStatus(t("walletStatusAlready", { symbol }), "error");
     openWalletEditor(symbol);
     return;
   }
@@ -2519,9 +2695,7 @@ function renderActiveGroups() {
   if (groups.length === 0) {
     const message = document.createElement("p");
     message.className = "empty";
-    message.textContent = activeMode === "lows"
-      ? "Ainda não há dados de baixas. Aguarde a próxima atualização."
-      : "Sem dados para exibir.";
+    message.textContent = activeMode === "lows" ? t("groupEmptyLows") : t("groupEmpty");
     groupsEl.appendChild(message);
   } else {
     groups.forEach((group, index) => {
@@ -2536,12 +2710,16 @@ function renderActiveGroups() {
 function modeDescription(mode) {
   if (mode === "wallet") {
     const positions = wallet.filter((entry) => entry.quantity > 0).length;
-    return `${wallet.length} ${wallet.length === 1 ? "ativo" : "ativos"} · ${positions} ${positions === 1 ? "posição" : "posições"}`;
+    return t("modeDescWallet", {
+      count: wallet.length,
+      assets: t(wallet.length === 1 ? "assetOne" : "assetMany"),
+      positions,
+      positionsLabel: t(positions === 1 ? "positionOne" : "positionMany"),
+    });
   }
 
   const config = MODES[mode] || MODES.highs;
-  const period = lastSnapshot?.b3Closed ? "do último pregão" : "do dia";
-  return `Top 10 maiores ${config.coverage} ${period}`;
+  return t(lastSnapshot?.b3Closed ? config.descLast : config.descToday);
 }
 
 function setMode(mode) {
@@ -2614,7 +2792,7 @@ async function fetchSnapshot() {
     return local;
   }
 
-  throw new Error("snapshot unavailable");
+  throw new Error(t("snapshotUnavailable"));
 }
 
 
@@ -2639,7 +2817,7 @@ async function fetchGroupLive(group, sortOrder) {
 
   const payload = await response.json();
   if (!Array.isArray(payload.stocks)) {
-    throw new Error("resposta inesperada da brapi");
+    throw new Error(t("unexpectedBrapiResponse"));
   }
 
   const items = [];
@@ -2738,7 +2916,7 @@ async function fetchLiveSnapshot(previousIndices = [], previousSnapshot = null) 
   }
 
   if (failures === LIVE_GROUPS.length * 2) {
-    throw new Error("brapi indisponível no momento");
+    throw new Error(t("brapiUnavailable"));
   }
 
   return {
@@ -2763,7 +2941,7 @@ async function load({ manual = false, forceLive = false } = {}) {
   }
 
   setLoading(true);
-  statusEl.textContent = manual || forceLive ? "Buscando atualização…" : "Carregando…";
+  statusEl.textContent = manual || forceLive ? t("statusFetching") : t("statusLoading");
   statusEl.classList.remove("error");
 
   try {
@@ -2788,7 +2966,7 @@ async function load({ manual = false, forceLive = false } = {}) {
         if (!snapshot) {
           throw error;
         }
-        showToast("Não foi possível atualizar agora; exibindo o último snapshot.", "error");
+        showToast(t("toastFallback"), "error");
       }
     }
 
@@ -2796,17 +2974,17 @@ async function load({ manual = false, forceLive = false } = {}) {
 
     if (manual) {
       showToast(
-        live ? "Dados atualizados direto da brapi." : "Dados recarregados com sucesso.",
+        live ? t("toastLive") : t("toastReloaded"),
         "success",
       );
     }
   } catch (error) {
-    statusEl.textContent = `Falha ao carregar: ${error.message}`;
+    statusEl.textContent = t("statusLoadError", { error: error.message });
     statusEl.classList.add("error");
-    showToast(`Falha ao atualizar: ${error.message}`, "error");
+    showToast(t("toastUpdateFailed", { error: error.message }), "error");
 
     if (!lastSnapshot) {
-      renderFatal("Não foi possível carregar os dados. Tente novamente em instantes.");
+      renderFatal(t("fatalLoad"));
     }
   } finally {
     setLoading(false);
@@ -2903,6 +3081,10 @@ for (const button of modeButtons) {
   });
 }
 
+langToggleEl?.addEventListener("click", () => {
+  setLanguage(currentLang === "pt-BR" ? "en-US" : "pt-BR");
+});
+
 if (chartDialogEl) {
   chartDialogEl.addEventListener("click", (event) => {
     if (event.target === chartDialogEl) {
@@ -2918,6 +3100,7 @@ if (chartDialogEl) {
   chartDialogEl.addEventListener("close", () => {
     const closedKey = activeChartKey;
     activeChartKey = null;
+    activeChartData = null;
 
     const trigger = lastChartTrigger?.isConnected
       ? lastChartTrigger
@@ -3312,6 +3495,7 @@ window.setInterval(() => {
 
 wallet = loadWallet();
 activeMode = loadActiveMode();
+applyStaticTranslations();
 applyModeState();
 bindWallet();
 applySharedWallet();

@@ -6,6 +6,14 @@ as entradas são agrupadas pela data em que a mudança entrou.
 
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## 2026-11-20
+
+### Adicionado
+
+- Seletor de idioma PT-BR/EN-US em todo o site, com PT-BR como padrão,
+  preferência salva no `localStorage`, formatação de números/datas por locale,
+  conteúdo dinâmico traduzido e uma camada de tradução via `data-i18n`.
+
 ## 2026-11-19
 
 ### Adicionado

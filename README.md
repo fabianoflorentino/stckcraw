@@ -15,6 +15,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
 - **Índices de mercado:** Ibovespa, Nasdaq, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
 - **Cotações rápidas:** Dólar, Euro, Ouro, Brent, Bitcoin e S&P 500 em cards compactos no topo do hero, com variação colorida (alta, baixa ou estável).
+- **PT-BR e EN-US:** PT-BR é o padrão; o seletor no hero ativa o inglês, salva a preferência no navegador e formata valores/datas no locale escolhido.
 - **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
 - **Carteira:** watchlist e posições com quantidade e preço médio, resultado em R$ e %, peso de cada ativo, export/import JSON e link compartilhável. Tudo fica no `localStorage`, sem conta ou servidor.
 - **Gráficos diários:** cada índice em destaque e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.

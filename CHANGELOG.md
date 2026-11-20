@@ -6,6 +6,14 @@ so entries are grouped by the date the change landed.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-11-20
+
+### Added
+
+- Site-wide PT-BR/EN-US language switch, with PT-BR as the default language,
+  the preference saved in `localStorage`, locale-aware number/date formatting,
+  translated dynamic content and a `data-i18n` translation layer.
+
 ## 2026-11-19
 
 ### Added
