@@ -22,6 +22,10 @@ export default {
       return history(url);
     }
 
+    if (url.pathname === "/quote") {
+      return quote(url);
+    }
+
     if (url.pathname !== "/trigger" || request.method !== "POST") {
       return new Response("not found", { status: 404 });
     }
@@ -122,22 +126,7 @@ async function history(url) {
   const closes = Array.isArray(series?.indicators?.quote?.[0]?.close)
     ? series.indicators.quote[0].close
     : [];
-  const points = [];
-  const count = Math.min(timestamps.length, closes.length);
-  for (let i = 0; i < count; i += 1) {
-    const close = closes[i];
-    const timestamp = timestamps[i];
-    if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
-      continue;
-    }
-    if (!Number.isFinite(timestamp) || timestamp <= 0) {
-      continue;
-    }
-    points.push({
-      date: new Date(timestamp * 1000).toISOString(),
-      close,
-    });
-  }
+  const points = historyPoints(timestamps, closes);
 
   if (points.length === 0) {
     return jsonError("history unavailable", 404);
@@ -159,6 +148,122 @@ async function history(url) {
     }
   }
   return output;
+}
+
+async function quote(url) {
+  const symbol = (url.searchParams.get("symbol") || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\.SA$/, "");
+  if (!/^[A-Z0-9]{4,12}$/.test(symbol)) {
+    return jsonError("invalid symbol", 400);
+  }
+
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+  const cacheKey = new Request(`https://stckcraw-quote/${symbol}`, { method: "GET" });
+  if (cache) {
+    try {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // Local runtimes may not implement the Cache API.
+    }
+  }
+
+  const target = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(`${symbol}.SA`)}`);
+  target.searchParams.set("range", "1mo");
+  target.searchParams.set("interval", "1d");
+
+  let response;
+  try {
+    response = await fetch(target, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "stckcraw-cloudflare-quote",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return jsonError(`quote request failed: ${message}`, 502);
+  }
+
+  if (!response.ok) {
+    return jsonError(`quote status ${response.status}`, response.status === 404 ? 404 : 502);
+  }
+
+  const payload = await response.json().catch(() => null);
+  const result = payload?.chart?.result?.[0];
+  const meta = result?.meta;
+  const price = Number(meta?.regularMarketPrice);
+  if (!result || !Number.isFinite(price) || price <= 0) {
+    return jsonError("quote unavailable", 404);
+  }
+
+  const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
+  const closes = Array.isArray(result.indicators?.quote?.[0]?.close)
+    ? result.indicators.quote[0].close
+    : [];
+  const points = historyPoints(timestamps, closes);
+  let change = Number(meta.regularMarketChangePercent);
+  if (!Number.isFinite(change) && points.length >= 2) {
+    const previous = points[points.length - 2].close;
+    change = previous > 0 ? (points[points.length - 1].close / previous - 1) * 100 : 0;
+  }
+  if (!Number.isFinite(change)) {
+    change = 0;
+  }
+
+  const marketTime = Number(meta.regularMarketTime);
+  const asOf = Number.isFinite(marketTime) && marketTime > 0
+    ? new Date(marketTime * 1000).toISOString()
+    : "";
+
+  const output = new Response(JSON.stringify({
+    symbol,
+    name: meta.longName || meta.shortName || symbol,
+    price,
+    change,
+    currency: meta.currency || "BRL",
+    asOf,
+    points,
+  }), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": "*",
+      "cache-control": "public, max-age=300, stale-while-revalidate=600",
+    },
+  });
+
+  if (cache) {
+    try {
+      await cache.put(cacheKey, output.clone());
+    } catch {
+      // Local runtimes may not implement the Cache API.
+    }
+  }
+  return output;
+}
+
+function historyPoints(timestamps, closes) {
+  const points = [];
+  const count = Math.min(timestamps.length, closes.length);
+  for (let i = 0; i < count; i += 1) {
+    const close = closes[i];
+    const timestamp = timestamps[i];
+    if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
+      continue;
+    }
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      continue;
+    }
+    points.push({
+      date: new Date(timestamp * 1000).toISOString(),
+      close,
+    });
+  }
+  return points;
 }
 
 function jsonError(message, status) {

@@ -115,7 +115,17 @@ curl "http://localhost:8787/history?symbol=PETR4"
 
 Resposta: `{"symbol":"PETR4","points":[{"date":"...","close":50.71}, ...]}`.
 
-O site em `localhost:8080` usa automaticamente `http://localhost:8787/history`; no domínio de produção ele usa `https://stckcraw-dispatch.fabianoflorentino.workers.dev/history` (o Worker precisa ser deployado com essa rota).
+O site em `localhost:8000` usa automaticamente `http://localhost:8787/history`; no domínio de produção ele usa `https://stckcraw-dispatch.fabianoflorentino.workers.dev/history` (o Worker precisa ser deployado com essa rota).
+
+### Cotação sob demanda
+
+A carteira usa a mesma ideia para ativos fora do snapshot:
+
+```bash
+curl "http://localhost:8787/quote?symbol=PETR4"
+```
+
+Resposta: `{"symbol":"PETR4","name":"Petróleo Brasileiro S.A. - Petrobras","price":42.67,"change":-1.158,"currency":"BRL","asOf":"...","points":[...]}`. O endpoint aceita `PETR4` ou `PETR4.SA`, valida o ticker, responde `404` para ativo inexistente e usa cache de 5 minutos.
 
 ## Segurança
 
@@ -124,7 +134,7 @@ O site em `localhost:8080` usa automaticamente `http://localhost:8787/history`; 
 - Não coloque o PAT no `docs/app.js`, no repositório ou em variáveis públicas do `wrangler.toml`.
 - O endpoint `/trigger` exige `TRIGGER_SECRET`; sem o secret, ele responde `401`.
 - O botão **Atualizar** do site **não** chama esse endpoint: ele busca a brapi diretamente no navegador. O Worker existe para manter o snapshot estático atualizado.
-- Os endpoints públicos são `/health`, `/snapshot`, `/history` e `/trigger`; `/trigger` exige `TRIGGER_SECRET`.
+- Os endpoints públicos são `/health`, `/snapshot`, `/history`, `/quote` e `/trigger`; `/trigger` exige `TRIGGER_SECRET`.
 
 ## Espelho estático no Cloudflare
 
