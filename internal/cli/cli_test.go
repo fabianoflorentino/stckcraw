@@ -127,6 +127,31 @@ func TestRunEndToEnd(t *testing.T) {
 	}
 }
 
+func TestRunLegacyAccessBlockedHintsDashboard(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Acesso Bloqueado", http.StatusForbidden)
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cli.Run(context.Background(), []string{
+		"-market", "b3",
+		"-type", "acao",
+		"-base-url", server.URL,
+		"-api-key", "test-key",
+		"-out", t.TempDir(),
+	}, &stdout, &stderr)
+
+	if code != cli.ExitError {
+		t.Fatalf("Run() code = %d, want %d", code, cli.ExitError)
+	}
+	if !strings.Contains(stderr.String(), "-dashboard") {
+		t.Errorf("stderr = %q, want dashboard hint", stderr.String())
+	}
+}
+
 func TestRunDashboardEndToEnd(t *testing.T) {
 	t.Parallel()
 

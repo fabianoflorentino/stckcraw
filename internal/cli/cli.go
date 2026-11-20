@@ -307,10 +307,27 @@ func run(ctx context.Context, opts options, stdout, stderr io.Writer) error {
 		return fmt.Errorf("crawl interrupted after %d of %d variants", len(results), len(opts.variants))
 	}
 	if failed > 0 {
+		if allAccessBlocked(results) {
+			writeFormat(stderr, "hint: a API legada do InfoMoney/XP bloqueou este IP; use -dashboard (brapi/Yahoo) para gerar o dashboard.\n")
+		}
 		return fmt.Errorf("%d of %d variants failed", failed, len(opts.variants))
 	}
 
 	return nil
+}
+
+func allAccessBlocked(results []crawler.Result) bool {
+	if len(results) == 0 {
+		return false
+	}
+
+	for _, result := range results {
+		if result.Err == nil || !errors.Is(result.Err, marketdata.ErrAccessBlocked) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func runDashboard(ctx context.Context, opts options, stdout, stderr io.Writer) error {

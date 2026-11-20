@@ -102,6 +102,9 @@ Resumo dos pacotes:
 Requisitos: Go 1.27+.
 
 ```bash
+# gera docs/data/latest.json e encerra (mesmo efeito de `make dashboard`)
+make run
+
 # gera docs/data/latest.json
 make dashboard
 
@@ -125,6 +128,8 @@ go run ./cmd/stckcraw -list
 ```
 
 ### Modo CSV legado (InfoMoney/XP)
+
+> A API legada do InfoMoney/XP pode responder `403 Acesso Bloqueado` conforme o IP/rede. Para gerar o dashboard, use o modo `-dashboard` (brapi + Yahoo), que é o caminho suportado.
 
 ```bash
 # baixa todas as variantes para ./data

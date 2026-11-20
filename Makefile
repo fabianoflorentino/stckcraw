@@ -51,11 +51,11 @@ fmt:
 vet:
 	$(GO) vet ./...
 
-## run: Build and run the application
+## run: Build and generate the dashboard snapshot (brapi + Yahoo)
 run: build
-	./bin/$(BINARY_NAME)
+	./bin/$(BINARY_NAME) -dashboard -out docs/data -limit 10
 
-## download: Download every supported leaderboard into ./data
+## download: Download every supported leaderboard into ./data (legacy InfoMoney/XP)
 download: build
 	./bin/$(BINARY_NAME) -out data
 
