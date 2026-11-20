@@ -8,6 +8,7 @@ const SEARCH_TIMEOUT_MS = 350;
 const SEARCH_LIMIT = 12;
 const REFRESH_MS = 5 * 60 * 1000;
 const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
+const STABLE_CHANGE_THRESHOLD = 0.1;
 
 const LIVE_GROUPS = [
   { key: "acoes", label: "Ações", type: "stock", subType: "stock" },
@@ -26,11 +27,13 @@ const toastEl = document.getElementById("toast");
 const backToTopEl = document.getElementById("back-to-top");
 const chartDialogEl = document.getElementById("index-chart");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
+const modeSwitchEl = document.querySelector(".mode-switch");
 const modeDescriptionEl = document.getElementById("mode-description");
 const assetSearchEl = document.querySelector(".asset-search");
 const searchToggleEl = document.getElementById("search-toggle");
 const searchInputEl = document.getElementById("asset-search");
 const searchResultsEl = document.getElementById("search-results");
+const tickerStripEl = document.getElementById("ticker-strip");
 
 const MODES = {
   highs: {
@@ -46,6 +49,13 @@ const MODES = {
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const usd = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -136,6 +146,21 @@ function formatPercent(value) {
 
 function formatPoints(value) {
   return Number.isFinite(value) ? points.format(value) : "—";
+}
+
+function formatQuotePrice(index) {
+  if (!Number.isFinite(index.price)) {
+    return "—";
+  }
+
+  if (index.currency === "BRL") {
+    return money.format(index.price);
+  }
+  if (index.currency === "USD") {
+    return usd.format(index.price);
+  }
+
+  return points.format(index.price);
 }
 
 function formatDate(value) {
@@ -784,6 +809,13 @@ function changeTone(value) {
   return value > 0 ? "positive" : "negative";
 }
 
+function quoteTone(value) {
+  if (!Number.isFinite(value)) {
+    return "neutral";
+  }
+  return Math.abs(value) < STABLE_CHANGE_THRESHOLD ? "flat" : changeTone(value);
+}
+
 function setLoading(isLoading) {
   loading = isLoading;
   refreshEl.disabled = isLoading;
@@ -913,15 +945,70 @@ function renderIndexCard(index, position) {
   return card;
 }
 
+function renderQuotePill(index) {
+  const pill = document.createElement("article");
+  const tone = index.error ? "neutral" : quoteTone(index.change);
+  const label = index.unit ? `${index.label || index.key} ${index.unit}` : (index.label || index.key);
+  pill.className = `ticker-pill ${tone}`;
+  pill.title = index.error
+    ? `Dados indisponíveis para ${index.label || index.key}`
+    : [label, index.symbol, formatIndexTime(index)]
+      .filter(Boolean)
+      .join(" · ");
+
+  const value = index.error ? "—" : formatQuotePrice(index);
+  const change = index.error ? "—" : formatPercent(index.change);
+  pill.innerHTML = `
+    <span class="ticker-label">${escapeHTML(label)}</span>
+    <span class="ticker-value">${escapeHTML(value)}</span>
+    <span class="ticker-change">${escapeHTML(change)}</span>`;
+
+  return pill;
+}
+
+function renderTickerStrip(indices) {
+  if (!tickerStripEl) {
+    return;
+  }
+
+  if (indices.length === 0) {
+    tickerStripEl.replaceChildren();
+    tickerStripEl.hidden = true;
+    return;
+  }
+
+  tickerStripEl.hidden = false;
+  tickerStripEl.replaceChildren(...indices.map(renderQuotePill));
+}
+
 function renderIndices(indices) {
   if (!Array.isArray(indices) || indices.length === 0) {
+    indicesEl.replaceChildren();
+    indicesEl.hidden = true;
+    renderTickerStrip([]);
+    return;
+  }
+
+  const major = [];
+  const compact = [];
+  for (const index of indices) {
+    if (index.compact) {
+      compact.push(index);
+    } else {
+      major.push(index);
+    }
+  }
+
+  renderTickerStrip(compact);
+
+  if (major.length === 0) {
     indicesEl.replaceChildren();
     indicesEl.hidden = true;
     return;
   }
 
   indicesEl.hidden = false;
-  indicesEl.replaceChildren(...indices.map((index, position) => renderIndexCard(index, position)));
+  indicesEl.replaceChildren(...major.map((index, position) => renderIndexCard(index, position)));
 }
 
 function renderHighlights(groups, mode) {

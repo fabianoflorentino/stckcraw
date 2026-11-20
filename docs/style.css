@@ -158,9 +158,22 @@ a:hover {
 }
 
 .hero > .hero-copy,
-.hero > .hero-actions {
+.hero > .hero-side {
   position: relative;
   z-index: 1;
+}
+
+.hero-side {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: stretch;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  margin-top: -16px;
+  margin-left: auto;
 }
 
 .brand-row {
@@ -469,6 +482,81 @@ h1 span {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.ticker-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
+  justify-content: end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ticker-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.ticker-pill {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 84px;
+  padding: 6px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
+  box-shadow: var(--shadow-sm), var(--highlight);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ticker-pill:hover {
+  border-color: rgba(89, 168, 255, 0.35);
+}
+
+.ticker-label {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ticker-value {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ticker-change {
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ticker-pill.positive .ticker-change {
+  color: var(--positive);
+}
+
+.ticker-pill.negative .ticker-change {
+  color: var(--negative);
+}
+
+.ticker-pill.flat .ticker-change {
+  color: var(--flat);
+}
+
+.ticker-pill.neutral .ticker-change {
+  color: var(--neutral);
 }
 
 .asset-search {
@@ -1725,9 +1813,21 @@ body:has(.chart-dialog[open]) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .ticker-strip {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: start;
+  }
+
   .hero {
     align-items: flex-start;
     padding-top: 36px;
+  }
+
+  .hero-side {
+    width: 100%;
+    align-items: flex-start;
+    margin-top: 0;
   }
 
   .hero-actions {

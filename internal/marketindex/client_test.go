@@ -86,6 +86,51 @@ func TestClientFetch(t *testing.T) {
 	}
 }
 
+func TestClientFetchCompactMetadata(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprint(w, `{"chart":{"result":[{
+			"meta":{
+				"symbol":"GC=F",
+				"regularMarketPrice":2650.4,
+				"regularMarketChangePercent":0.42,
+				"regularMarketTime":1793294520,
+				"currency":"USD",
+				"exchangeTimezoneName":"America/New_York"
+			},
+			"indicators":{"quote":[{"close":[2639.1,2650.4]}]}
+		}],"error":null}}`); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client, err := marketindex.NewClient(marketindex.WithBaseURL(server.URL))
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	quote, err := client.Fetch(context.Background(), marketindex.Definition{
+		Key:     "ouro",
+		Label:   "Ouro",
+		Symbol:  "GC=F",
+		Compact: true,
+		Unit:    "/oz",
+	})
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+
+	if !quote.Compact {
+		t.Error("Compact = false, want true")
+	}
+	if quote.Unit != "/oz" {
+		t.Errorf("Unit = %q, want /oz", quote.Unit)
+	}
+}
+
 func TestClientFetchHistorySkipsEmptyCloses(t *testing.T) {
 	t.Parallel()
 
@@ -364,7 +409,7 @@ func TestClientFetchAllUsesFallback(t *testing.T) {
 	defer server.Close()
 
 	fallback := []marketindex.Quote{
-		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP", Price: 169000, Change: -1.5},
+		{Key: "ouro", Label: "Ouro", Symbol: "GC=F", Price: 2650, Change: 1.2},
 	}
 
 	client, err := marketindex.NewClient(
@@ -376,7 +421,7 @@ func TestClientFetchAllUsesFallback(t *testing.T) {
 	}
 
 	quotes, err := client.FetchAll(context.Background(), []marketindex.Definition{
-		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP"},
+		{Key: "ouro", Label: "Ouro", Symbol: "GC=F", Compact: true, Unit: "/oz"},
 	})
 	if err != nil {
 		t.Fatalf("FetchAll() error = %v", err)
@@ -384,8 +429,11 @@ func TestClientFetchAllUsesFallback(t *testing.T) {
 	if len(quotes) != 1 {
 		t.Fatalf("quotes = %d, want 1", len(quotes))
 	}
-	if quotes[0].Error != "" || quotes[0].Price != 169000 {
+	if quotes[0].Error != "" || quotes[0].Price != 2650 {
 		t.Errorf("fallback quote = %+v", quotes[0])
+	}
+	if !quotes[0].Compact || quotes[0].Unit != "/oz" {
+		t.Errorf("fallback metadata = %+v", quotes[0])
 	}
 }
 
@@ -439,12 +487,25 @@ func TestDefaultIndices(t *testing.T) {
 	t.Parallel()
 
 	indices := marketindex.DefaultIndices()
-	if len(indices) != 4 {
-		t.Fatalf("DefaultIndices() returned %d indices, want 4", len(indices))
+	if len(indices) != 10 {
+		t.Fatalf("DefaultIndices() returned %d indices, want 10", len(indices))
 	}
+
+	seen := make(map[string]struct{}, len(indices))
+	compact := 0
 	for _, index := range indices {
 		if index.Key == "" || index.Label == "" || index.Symbol == "" {
 			t.Errorf("incomplete index: %+v", index)
 		}
+		if _, ok := seen[index.Key]; ok {
+			t.Errorf("duplicate index key %q", index.Key)
+		}
+		seen[index.Key] = struct{}{}
+		if index.Compact {
+			compact++
+		}
+	}
+	if compact != 6 {
+		t.Errorf("compact indices = %d, want 6", compact)
 	}
 }

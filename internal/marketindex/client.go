@@ -23,11 +23,13 @@ const (
 	historyBatchSize = 20
 )
 
-// Definition describes one index shown on the dashboard.
+// Definition describes one index or quote shown on the dashboard.
 type Definition struct {
-	Key    string
-	Label  string
-	Symbol string
+	Key     string
+	Label   string
+	Symbol  string
+	Compact bool
+	Unit    string
 }
 
 // HistoryPoint is one daily close used by the index chart.
@@ -45,19 +47,28 @@ type Quote struct {
 	Price    float64        `json:"price"`
 	Change   float64        `json:"change"`
 	Currency string         `json:"currency,omitempty"`
+	Unit     string         `json:"unit,omitempty"`
+	Compact  bool           `json:"compact,omitempty"`
 	Timezone string         `json:"timezone,omitempty"`
 	AsOf     time.Time      `json:"asOf"`
 	History  []HistoryPoint `json:"history,omitempty"`
 	Error    string         `json:"error,omitempty"`
 }
 
-// DefaultIndices returns the market overview shown above the B3 tables.
+// DefaultIndices returns the market overview shown above the B3 tables. The
+// compact entries are rendered as small quotes next to the search box.
 func DefaultIndices() []Definition {
 	return []Definition{
 		{Key: "ibovespa", Label: "Ibovespa", Symbol: "^BVSP"},
-		{Key: "sp500", Label: "S&P 500", Symbol: "^GSPC"},
+		{Key: "nasdaq", Label: "Nasdaq", Symbol: "^IXIC"},
 		{Key: "stoxx50", Label: "Euro Stoxx 50", Symbol: "^STOXX50E"},
 		{Key: "shanghai", Label: "Shanghai", Symbol: "000001.SS"},
+		{Key: "dolar", Label: "Dólar", Symbol: "BRL=X", Compact: true},
+		{Key: "euro", Label: "Euro", Symbol: "EURBRL=X", Compact: true},
+		{Key: "ouro", Label: "Ouro", Symbol: "GC=F", Compact: true, Unit: "/oz"},
+		{Key: "brent", Label: "Brent", Symbol: "BZ=F", Compact: true, Unit: "/bbl"},
+		{Key: "bitcoin", Label: "Bitcoin", Symbol: "BTC-USD", Compact: true},
+		{Key: "sp500", Label: "S&P 500", Symbol: "^GSPC", Compact: true},
 	}
 }
 
@@ -154,14 +165,18 @@ func (c *Client) FetchAll(ctx context.Context, definitions []Definition) ([]Quot
 				return quotes, ctx.Err()
 			}
 			if cached, ok := c.fallback[definition.Key]; ok {
+				cached.Compact = definition.Compact
+				cached.Unit = definition.Unit
 				quotes = append(quotes, cached)
 				continue
 			}
 			quotes = append(quotes, Quote{
-				Key:    definition.Key,
-				Label:  definition.Label,
-				Symbol: definition.Symbol,
-				Error:  err.Error(),
+				Key:     definition.Key,
+				Label:   definition.Label,
+				Symbol:  definition.Symbol,
+				Compact: definition.Compact,
+				Unit:    definition.Unit,
+				Error:   err.Error(),
 			})
 			continue
 		}
@@ -247,6 +262,8 @@ func (c *Client) Fetch(ctx context.Context, definition Definition) (Quote, error
 		Price:    meta.RegularMarketPrice,
 		Change:   change,
 		Currency: meta.Currency,
+		Unit:     definition.Unit,
+		Compact:  definition.Compact,
 		Timezone: meta.ExchangeTimezoneName,
 		AsOf:     asOf,
 		History:  history,

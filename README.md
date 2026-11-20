@@ -12,9 +12,10 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 ## O que tem
 
 - **6 grupos:** Ações, FIIs, FIPs, ETFs, BDRs e Units.
-- **Índices de mercado:** Ibovespa, S&P 500, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
+- **Índices de mercado:** Ibovespa, Nasdaq, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
+- **Cotações rápidas:** Dólar, Euro, Ouro, Brent, Bitcoin e S&P 500 em cards compactos no topo do hero, com variação colorida (alta, baixa ou estável).
 - **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
-- **Gráficos diários:** cada índice e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
+- **Gráficos diários:** cada índice em destaque e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
@@ -33,7 +34,7 @@ flowchart LR
   runner --> test["go test ./..."]
   runner --> crawler["stckcraw -dashboard"]
   crawler -->|12 requisições| brapi["brapi.dev"]
-  crawler -->|4 requisições| yahoo["Yahoo Finance"]
+  crawler -->|10 requisições| yahoo["Yahoo Finance"]
   crawler --> json["docs/data/latest.json"]
   json --> artifact["Artifact docs/"]
   artifact --> pages["GitHub Pages"]
@@ -42,7 +43,7 @@ flowchart LR
   user -.->|snapshot velho| brapi
 ```
 
-O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **4 vezes** para os índices e em **lotes de até 20 símbolos** para o histórico dos ativos, usando `range=1mo&interval=1d`. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices e as abas de altas/baixas.
+O crawler consulta a brapi **12 vezes por execução**: 6 tipos × 2 direções (`desc` para altas e `asc` para baixas). Também consulta a Yahoo Finance **10 vezes** para os índices e as cotações rápidas e em **lotes de até 20 símbolos** para o histórico dos ativos, usando `range=1mo&interval=1d`. O resultado é normalizado, os tickers fracionários são descartados e um único `latest.json` alimenta os cards de índices, as cotações compactas e as abas de altas/baixas.
 
 A busca consulta `GET /quote/list?search=...` na brapi. Para ativos fora do snapshot, o histórico do gráfico é carregado sob demanda pelo endpoint `/history` do Worker Cloudflare, que usa Yahoo Spark e cache de borda. Localmente, rode `cd cloudflare && npx wrangler dev --port 8787` junto com o site.
 
@@ -255,21 +256,23 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 - `financialVolume` é aproximado por `preço × quantidade`, pois a brapi devolve quantidade.
 - `b3AsOf`/`b3Closed` indicam o último pregão da B3 e se ele é anterior ao dia do snapshot.
 - `indices[].history` e `groups[].items[].history` contêm os fechamentos diários do último mês, em ordem cronológica, usados no mini gráfico e na janela expandida.
+- `indices[].compact` marca as cotações exibidas nos cards pequenos ao lado da busca; `indices[].unit` informa a unidade quando o preço não é monetário em BRL (por exemplo, `/oz` e `/bbl`).
 
 ## Dados e limitações
 
 | Item | Situação |
 |---|---|
-| Fonte | brapi.dev (B3) + Yahoo Finance (índices), sem autenticação |
+| Fonte | brapi.dev (B3) + Yahoo Finance (índices e cotações), sem autenticação |
 | Cobertura | B3: Ações, FIIs, FIPs, ETFs, BDRs e Units |
-| Índices | Ibovespa (`^BVSP`), S&P 500 (`^GSPC`), Euro Stoxx 50 (`^STOXX50E`) e Shanghai (`000001.SS`) |
+| Índices | Ibovespa (`^BVSP`), Nasdaq (`^IXIC`), Euro Stoxx 50 (`^STOXX50E`) e Shanghai (`000001.SS`) |
+| Cotações rápidas | Dólar (`BRL=X`), Euro (`EURBRL=X`), Ouro (`GC=F`), Brent (`BZ=F`), Bitcoin (`BTC-USD`) e S&P 500 (`^GSPC`) |
 | Horário dos índices | cada card mostra a última cotação no fuso da bolsa |
 | Gráficos | fechamentos diários de 1 mês para índices e ativos, em SVG nativo e sem biblioteca externa |
 | Histórico dos ativos | Yahoo Spark em lotes de até 20 símbolos `.SA`; ativos sem série ficam sem gráfico |
 | Preço vs. gráfico | preço/variação da tabela vêm da brapi; os fechamentos do gráfico vêm da Yahoo, então pequenas diferenças são esperadas |
 | Ordenação | variação percentual do dia |
 | Volume | aproximado (`preço × quantidade`) |
-| Nasdaq/NYSE | não implementados |
+| Nasdaq/NYSE no CSV legado | não implementados |
 | Tickers fracionários | descartados |
 | Feriados B3 | o workflow roda, marca `b3Closed` e mantém o último pregão da B3; os índices abertos seguem atualizando |
 | Rate limit brapi | 20 req/min; usamos 12 por execução |

@@ -36,24 +36,29 @@
       </p>
     </div>
 
-    <div class="hero-actions reveal reveal-right">
-      <p id="status" class="status" aria-live="polite">Carregando…</p>
-      <div class="actions">
-        <button id="refresh" class="button button-primary" type="button"
-          title="Recarrega o JSON mais recente. Para gerar novos dados, rode o workflow no GitHub.">
-          <span class="spinner" aria-hidden="true"></span>
-          <span class="button-label">Atualizar</span>
-        </button>
-        <a class="button button-ghost"
-          href="https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml"
-          target="_blank" rel="noopener noreferrer">Workflow</a>
+    <div class="hero-side reveal reveal-right">
+      <div id="ticker-strip" class="ticker-strip" role="group" aria-label="Cotações de dólar, euro, ouro, petróleo e bitcoin" hidden></div>
+
+      <div class="hero-actions">
+        <p id="status" class="status" aria-live="polite">Carregando…</p>
+        <div class="actions">
+          <button id="refresh" class="button button-primary" type="button"
+            title="Recarrega o JSON mais recente. Para gerar novos dados, rode o workflow no GitHub.">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="button-label">Atualizar</span>
+          </button>
+          <a class="button button-ghost"
+            href="https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml"
+            target="_blank" rel="noopener noreferrer">Workflow</a>
+        </div>
       </div>
     </div>
   </header>
 
   <section class="toolbar reveal" aria-label="Direção da variação">
     <div class="toolbar-start">
-      <div class="mode-switch" role="tablist" aria-label="Altas ou baixas">
+      <div class="mode-switch" role="tablist" aria-label="Altas ou baixas" data-mode="highs">
+        <span class="mode-indicator" aria-hidden="true"></span>
         <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
         <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
       </div>

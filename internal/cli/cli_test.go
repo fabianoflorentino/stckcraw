@@ -214,8 +214,17 @@ func TestRunDashboardEndToEnd(t *testing.T) {
 	if len(snapshot.Lows[0].Items) != 1 || snapshot.Lows[0].Items[0].Symbol != "PETR4" {
 		t.Errorf("unexpected first low group: %+v", snapshot.Lows[0])
 	}
-	if len(snapshot.Indices) != 4 {
-		t.Fatalf("indices = %d, want 4", len(snapshot.Indices))
+	if len(snapshot.Indices) != 10 {
+		t.Fatalf("indices = %d, want 10", len(snapshot.Indices))
+	}
+	compact := 0
+	for _, index := range snapshot.Indices {
+		if index.Compact {
+			compact++
+		}
+	}
+	if compact != 6 {
+		t.Errorf("compact indices = %d, want 6", compact)
 	}
 	if snapshot.Indices[0].Price != 169081.88 || snapshot.Indices[0].Key != "ibovespa" {
 		t.Errorf("unexpected first index: %+v", snapshot.Indices[0])
