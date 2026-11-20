@@ -15,6 +15,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Índices de mercado:** Ibovespa, Nasdaq, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
 - **Cotações rápidas:** Dólar, Euro, Ouro, Brent, Bitcoin e S&P 500 em cards compactos no topo do hero, com variação colorida (alta, baixa ou estável).
 - **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
+- **Carteira:** watchlist e posições com quantidade e preço médio, resultado em R$ e %, peso de cada ativo, export/import JSON e link compartilhável. Tudo fica no `localStorage`, sem conta ou servidor.
 - **Gráficos diários:** cada índice em destaque e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
@@ -117,6 +118,9 @@ Ou diretamente:
 ```bash
 go run ./cmd/stckcraw -dashboard -out docs/data -limit 10
 python3 -m http.server -d docs 8000
+
+# opcional: cotações da carteira para ativos fora do snapshot
+cd cloudflare && npx wrangler dev --port 8787
 ```
 
 Opções úteis:
@@ -262,6 +266,27 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 - `b3AsOf`/`b3Closed` indicam o último pregão da B3 e se ele é anterior ao dia do snapshot.
 - `indices[].history` e `groups[].items[].history` contêm os fechamentos diários do último mês, em ordem cronológica, usados no mini gráfico e na janela expandida.
 - `indices[].compact` marca as cotações exibidas nos cards pequenos ao lado da busca; `indices[].unit` informa a unidade quando o preço não é monetário em BRL (por exemplo, `/oz` e `/bbl`).
+
+## Carteira
+
+A carteira fica só no navegador, em `localStorage` na chave `stckcraw:wallet`. Cada ativo tem `symbol`, `name`, `quantity` e `averagePrice`; quantidade vazia significa watchlist. O modo ativo também é lembrado em `stckcraw:mode`.
+
+Cotações vêm do snapshot quando o ativo está no top 10; fora dele, o frontend consulta o Worker `/quote` (Yahoo), com fallback para a busca da brapi, cache de 5 minutos e último valor salvo no próprio `localStorage`.
+
+Exportação:
+
+```json
+{
+  "version": 1,
+  "exported_at": "2026-11-19T22:00:00.000Z",
+  "carteira": "Carteira",
+  "assets": [
+    { "symbol": "PETR4", "name": "Petrobras", "quantity": 100, "averagePrice": 30.5 }
+  ]
+}
+```
+
+O import faz união por ticker: ativos novos entram como watchlist ou posição; quantidades e preços médios existentes só são substituídos quando o arquivo traz valores maiores que zero. O link `?carteira=PETR4,VALE3` importa apenas os tickers, como watchlist, sem compartilhar quantidades.
 
 ## Dados e limitações
 

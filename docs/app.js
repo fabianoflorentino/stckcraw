@@ -3,12 +3,19 @@ const SNAPSHOT_FALLBACK_URL = "https://stckcraw-dispatch.fabianoflorentino.worke
 const HISTORY_URL = ["localhost", "127.0.0.1"].includes(window.location.hostname)
   ? "http://localhost:8787/history"
   : "https://stckcraw-dispatch.fabianoflorentino.workers.dev/history";
+const QUOTE_URL = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ? "http://localhost:8787/quote"
+  : "https://stckcraw-dispatch.fabianoflorentino.workers.dev/quote";
 const SEARCH_URL = "https://brapi.dev/api/quote/list";
 const SEARCH_TIMEOUT_MS = 350;
 const SEARCH_LIMIT = 12;
 const REFRESH_MS = 5 * 60 * 1000;
 const SNAPSHOT_MAX_AGE_MS = 35 * 60 * 1000;
 const STABLE_CHANGE_THRESHOLD = 0.1;
+const WALLET_KEY = "stckcraw:wallet";
+const MODE_KEY = "stckcraw:mode";
+const WALLET_QUOTE_MS = 5 * 60 * 1000;
+const WALLET_SYMBOL_PATTERN = /^[A-Z0-9]{4,12}$/;
 
 const LIVE_GROUPS = [
   { key: "acoes", label: "Ações", type: "stock", subType: "stock" },
@@ -34,6 +41,27 @@ const searchToggleEl = document.getElementById("search-toggle");
 const searchInputEl = document.getElementById("asset-search");
 const searchResultsEl = document.getElementById("search-results");
 const tickerStripEl = document.getElementById("ticker-strip");
+const walletEl = document.getElementById("wallet");
+const walletSummaryEl = document.getElementById("wallet-summary");
+const walletStatusEl = document.getElementById("wallet-status");
+const walletTableWrapEl = document.getElementById("wallet-table-wrap");
+const walletEmptyEl = document.getElementById("wallet-empty");
+const walletAddFormEl = document.getElementById("wallet-add-form");
+const walletAddInputEl = document.getElementById("wallet-add-input");
+const walletExportEl = document.getElementById("wallet-export");
+const walletImportEl = document.getElementById("wallet-import");
+const walletLinkEl = document.getElementById("wallet-link");
+const walletFileEl = document.getElementById("wallet-file");
+const walletEditDialogEl = document.getElementById("wallet-edit");
+const walletEditFormEl = document.getElementById("wallet-edit-form");
+const walletEditTitleEl = document.getElementById("wallet-edit-title");
+const walletEditSymbolEl = document.getElementById("wallet-edit-symbol");
+const walletEditQuantityEl = document.getElementById("wallet-edit-quantity");
+const walletEditAverageEl = document.getElementById("wallet-edit-average");
+const walletEditErrorEl = document.getElementById("wallet-edit-error");
+const walletEditCloseEl = document.getElementById("wallet-edit-close");
+const walletEditCancelEl = document.getElementById("wallet-edit-cancel");
+const walletSuggestionsEl = document.getElementById("wallet-suggestions");
 
 const MODES = {
   highs: {
@@ -43,6 +71,10 @@ const MODES = {
   lows: {
     topLabel: "Maior queda",
     coverage: "baixas",
+  },
+  wallet: {
+    topLabel: "Carteira",
+    coverage: "carteira",
   },
 };
 
@@ -70,6 +102,10 @@ const points = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 2,
 });
 
+const quantity = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 8,
+});
+
 const percent = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -90,6 +126,15 @@ let searchController = null;
 let searchItems = [];
 let activeSearchIndex = -1;
 const searchCache = new Map();
+let wallet = [];
+let walletEditSymbol = "";
+const walletQuotes = new Map();
+const walletQuoteRequests = new Map();
+let walletSearchTimer = null;
+let walletSearchController = null;
+let walletSearchItems = [];
+let walletSearchIndex = -1;
+const walletSearchCache = new Map();
 const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
 const COLLAPSED_KEY = "stckcraw:collapsed";
@@ -1170,6 +1215,7 @@ function buildTable(items) {
       : 0;
     const sector = item.sector || "—";
     const chartPoints = indexChartPoints(item);
+    const inWallet = isInWallet(item.symbol);
     const chartButton = chartPoints.length >= 2
       ? `<button type="button" class="spark-button" data-chart-key="asset:${escapeHTML(item.symbol)}" aria-label="Abrir gráfico diário de ${escapeHTML(item.symbol)}" title="Ver gráfico diário">${buildSparkline(chartPoints, changeTone(periodChange(chartPoints)))}</button>`
       : '<span class="chart-na">—</span>';
@@ -1182,8 +1228,13 @@ function buildTable(items) {
     row.innerHTML = `
       <td><span class="rank${rankClass}">${escapeHTML(item.rank)}</span></td>
       <td>
-        <span class="symbol">${escapeHTML(item.symbol)}</span>
-        <span class="asset-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
+        <span class="asset-cell">
+          <button type="button" class="wallet-star" data-symbol="${escapeHTML(item.symbol)}" data-name="${escapeHTML(item.name)}" aria-pressed="${inWallet}" aria-label="${inWallet ? "Remover" : "Adicionar"} ${escapeHTML(item.symbol)} ${inWallet ? "da" : "à"} carteira">${inWallet ? "★" : "☆"}</button>
+          <span class="asset-id">
+            <span class="symbol">${escapeHTML(item.symbol)}</span>
+            <span class="asset-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
+          </span>
+        </span>
       </td>
       <td class="chart-cell">${chartButton}</td>
       <td>${formatMoney(item.price)}</td>
@@ -1199,9 +1250,16 @@ function buildTable(items) {
     if (chartButtonEl) {
       chartButtonEl.addEventListener("click", () => openChart(assetChart(item), chartButtonEl));
     }
+    const walletStarEl = row.querySelector(".wallet-star");
+    if (walletStarEl) {
+      walletStarEl.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleWallet(item.symbol, item.name);
+      });
+    }
     const chartTrigger = chartButtonEl || row;
     row.addEventListener("click", (event) => {
-      if (event.target.closest(".spark-button")) {
+      if (event.target.closest(".spark-button, .wallet-star")) {
         return;
       }
       openChart(assetChart(item), chartTrigger);
@@ -1318,7 +1376,1138 @@ function toggleAllGroups(groups) {
   highlightsEl.querySelector('[data-action="toggle-groups"]')?.focus();
 }
 
+function normalizeWalletSymbol(value) {
+  return String(value || "").trim().toUpperCase().replace(/\.SA$/, "");
+}
+
+function isValidWalletSymbol(symbol) {
+  return WALLET_SYMBOL_PATTERN.test(symbol);
+}
+
+function parseWalletNumber(value) {
+  const normalized = String(value ?? "").trim().replace(/\s/g, "").replace(",", ".");
+  if (!normalized) {
+    return 0;
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function formatQuantity(value) {
+  return Number.isFinite(value) ? quantity.format(value) : "—";
+}
+
+function normalizeWalletEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const symbol = normalizeWalletSymbol(entry.symbol || entry.stock || entry.ticker);
+  if (!isValidWalletSymbol(symbol)) {
+    return null;
+  }
+
+  return {
+    symbol,
+    name: String(entry.name || "").trim(),
+    quantity: parseWalletNumber(entry.quantity ?? entry.qty),
+    averagePrice: parseWalletNumber(entry.averagePrice ?? entry.average ?? entry.avgPrice),
+    lastPrice: parseWalletNumber(entry.lastPrice),
+    lastChange: Number(entry.lastChange) || 0,
+    lastAsOf: typeof entry.lastAsOf === "string" ? entry.lastAsOf : "",
+    addedAt: typeof entry.addedAt === "string" ? entry.addedAt : new Date().toISOString(),
+  };
+}
+
+function loadWallet() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WALLET_KEY) || "[]");
+    const entries = Array.isArray(parsed) ? parsed.map(normalizeWalletEntry).filter(Boolean) : [];
+    const unique = new Map();
+    for (const entry of entries) {
+      if (!unique.has(entry.symbol)) {
+        unique.set(entry.symbol, entry);
+      }
+    }
+    return [...unique.values()];
+  } catch {
+    return [];
+  }
+}
+
+function saveWallet() {
+  try {
+    window.localStorage.setItem(WALLET_KEY, JSON.stringify(wallet));
+  } catch {
+    // Storage may be unavailable in private mode.
+  }
+}
+
+function findWalletEntry(symbol) {
+  return wallet.find((entry) => entry.symbol === symbol) || null;
+}
+
+function isInWallet(symbol) {
+  return wallet.some((entry) => entry.symbol === symbol);
+}
+
+function loadActiveMode() {
+  try {
+    const stored = window.localStorage.getItem(MODE_KEY);
+    return MODES[stored] ? stored : "highs";
+  } catch {
+    return "highs";
+  }
+}
+
+function saveActiveMode(mode) {
+  try {
+    window.localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Storage may be unavailable in private mode.
+  }
+}
+
+function applyModeState() {
+  if (modeSwitchEl) {
+    modeSwitchEl.dataset.mode = activeMode;
+  }
+  for (const button of modeButtons) {
+    const isActive = button.dataset.mode === activeMode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  }
+}
+
+function snapshotAssetMap() {
+  const assets = new Map();
+  for (const groups of [lastSnapshot?.groups, lastSnapshot?.lows]) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of group.items || []) {
+        const symbol = normalizeWalletSymbol(item.symbol);
+        if (symbol && !assets.has(symbol)) {
+          assets.set(symbol, item);
+        }
+      }
+    }
+  }
+  return assets;
+}
+
+function walletQuoteFor(entry, assets) {
+  const cached = walletQuotes.get(entry.symbol);
+  const snapshot = assets.get(entry.symbol);
+  if (cached && Number.isFinite(cached.price) && cached.price > 0) {
+    return {
+      ...cached,
+      name: cached.name || snapshot?.name || entry.name,
+      history: cached.history?.length ? cached.history : (snapshot?.history || []),
+      asOf: cached.asOf || lastSnapshot?.generatedAt || "",
+    };
+  }
+
+  if (snapshot) {
+    return {
+      price: Number(snapshot.price) || 0,
+      change: Number(snapshot.change) || 0,
+      name: snapshot.name || entry.name,
+      history: Array.isArray(snapshot.history) ? snapshot.history : [],
+      asOf: lastSnapshot?.generatedAt || "",
+    };
+  }
+
+  if (entry.lastPrice > 0) {
+    return {
+      price: entry.lastPrice,
+      change: entry.lastChange,
+      name: entry.name,
+      history: [],
+      asOf: entry.lastAsOf,
+    };
+  }
+
+  return null;
+}
+
+async function fetchWorkerWalletQuote(symbol) {
+  const response = await fetch(`${QUOTE_URL}?symbol=${encodeURIComponent(symbol)}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const price = Number(payload.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("cotação indisponível");
+  }
+
+  return {
+    price,
+    change: Number(payload.change) || 0,
+    name: String(payload.name || ""),
+    asOf: typeof payload.asOf === "string" ? payload.asOf : "",
+    history: Array.isArray(payload.points) ? payload.points : [],
+    at: Date.now(),
+  };
+}
+
+async function fetchBrapiWalletQuote(symbol) {
+  const params = new URLSearchParams({
+    search: symbol,
+    limit: String(SEARCH_LIMIT),
+  });
+  const response = await fetch(`${SEARCH_URL}?${params}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const match = (Array.isArray(payload.stocks) ? payload.stocks : [])
+    .find((asset) => normalizeWalletSymbol(asset.stock) === symbol);
+  const price = Number(match?.close);
+  if (!match || !Number.isFinite(price) || price <= 0) {
+    throw new Error("cotação indisponível");
+  }
+
+  return {
+    price,
+    change: Number(match.change) || 0,
+    name: String(match.name || ""),
+    asOf: "",
+    history: [],
+    at: Date.now(),
+  };
+}
+
+async function fetchWalletQuote(symbol) {
+  try {
+    return await fetchWorkerWalletQuote(symbol);
+  } catch {
+    return fetchBrapiWalletQuote(symbol);
+  }
+}
+
+function requestWalletQuote(symbol) {
+  if (walletQuoteRequests.has(symbol)) {
+    return walletQuoteRequests.get(symbol);
+  }
+
+  const request = fetchWalletQuote(symbol).finally(() => {
+    walletQuoteRequests.delete(symbol);
+  });
+  walletQuoteRequests.set(symbol, request);
+  return request;
+}
+
+function walletQuoteIsFresh(symbol) {
+  const quote = walletQuotes.get(symbol);
+  return Boolean(quote && quote.at && Date.now() - quote.at < WALLET_QUOTE_MS);
+}
+
+async function hydrateWalletEntry(symbol) {
+  const entry = findWalletEntry(symbol);
+  if (!entry) {
+    throw new Error("ativo não encontrado na carteira");
+  }
+
+  const quote = await requestWalletQuote(symbol);
+  walletQuotes.set(symbol, quote);
+  if (!entry.name && quote.name) {
+    entry.name = quote.name;
+  }
+  entry.lastPrice = quote.price;
+  entry.lastChange = quote.change;
+  entry.lastAsOf = quote.asOf || new Date().toISOString();
+  saveWallet();
+}
+
+async function refreshWalletQuotes() {
+  if (wallet.length === 0) {
+    return;
+  }
+
+  const assets = snapshotAssetMap();
+  const pending = wallet.filter((entry) => !assets.has(entry.symbol) && !walletQuoteIsFresh(entry.symbol));
+  if (pending.length === 0) {
+    return;
+  }
+
+  await Promise.allSettled(pending.map((entry) => hydrateWalletEntry(entry.symbol)));
+  saveWallet();
+  if (activeMode === "wallet") {
+    renderWallet();
+  }
+}
+
+function setWalletStatus(message, tone = "") {
+  if (!walletStatusEl) {
+    return;
+  }
+  walletStatusEl.textContent = message || "";
+  walletStatusEl.className = `wallet-status ${tone}`.trim();
+}
+
+function updateWalletStar(star, symbol) {
+  const inWallet = isInWallet(symbol);
+  const name = star.dataset.name || symbol;
+  star.setAttribute("aria-pressed", String(inWallet));
+  star.setAttribute("aria-label", `${inWallet ? "Remover" : "Adicionar"} ${name} ${inWallet ? "da" : "à"} carteira`);
+  star.textContent = inWallet ? "★" : "☆";
+}
+
+function updateWalletStars(symbol) {
+  for (const star of document.querySelectorAll(`.wallet-star[data-symbol="${CSS.escape(symbol)}"]`)) {
+    updateWalletStar(star, symbol);
+  }
+}
+
+function walletStat(label, value, meta, tone = "neutral") {
+  const card = document.createElement("article");
+  card.className = "wallet-stat";
+  card.innerHTML = `
+    <span class="wallet-stat-label">${escapeHTML(label)}</span>
+    <strong class="wallet-stat-value ${tone}">${escapeHTML(value)}</strong>
+    <span class="wallet-stat-meta">${escapeHTML(meta)}</span>`;
+  return card;
+}
+
+function walletRows(assets) {
+  return wallet.map((entry) => {
+    const quote = walletQuoteFor(entry, assets);
+    const price = quote?.price ?? 0;
+    const hasPrice = Number.isFinite(price) && price > 0;
+    const isPosition = entry.quantity > 0;
+    const invested = isPosition && entry.averagePrice > 0 ? entry.quantity * entry.averagePrice : null;
+    const current = isPosition && hasPrice ? entry.quantity * price : null;
+    const pnl = invested !== null && current !== null ? current - invested : null;
+    const pnlPercent = pnl !== null && invested > 0 ? (pnl / invested) * 100 : null;
+
+    return {
+      entry,
+      quote,
+      price,
+      hasPrice,
+      invested,
+      current,
+      pnl,
+      pnlPercent,
+      isPosition,
+    };
+  }).sort((a, b) => {
+    if (a.isPosition !== b.isPosition) {
+      return a.isPosition ? -1 : 1;
+    }
+    if (a.isPosition) {
+      return (b.current || 0) - (a.current || 0);
+    }
+    return a.entry.symbol.localeCompare(b.entry.symbol);
+  });
+}
+
+function walletTable(rows) {
+  const totalCurrent = rows.reduce((total, row) => total + (row.current || 0), 0);
+  const table = document.createElement("table");
+  table.className = "group-table wallet-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Ativo</th>
+        <th>Último</th>
+        <th>Var. dia</th>
+        <th>Qtd.</th>
+        <th>Preço médio</th>
+        <th>Investido</th>
+        <th>Valor atual</th>
+        <th>Resultado</th>
+        <th>Peso</th>
+        <th>Ações</th>
+      </tr>
+    </thead>`;
+
+  const tbody = document.createElement("tbody");
+  for (const row of rows) {
+    const { entry, quote, hasPrice, invested, current, pnl, pnlPercent, isPosition } = row;
+    const tone = quote ? changeTone(quote.change) : "neutral";
+    const priceText = hasPrice ? formatMoney(row.price) : "—";
+    const changeText = quote ? formatPercent(quote.change) : "—";
+    const quantityText = isPosition ? formatQuantity(entry.quantity) : "—";
+    const averageText = entry.averagePrice > 0 ? formatMoney(entry.averagePrice) : "—";
+    const investedText = invested !== null ? formatMoney(invested) : "—";
+    const currentText = current !== null ? formatMoney(current) : "—";
+    const pnlText = pnl !== null ? formatMoney(pnl) : "—";
+    const pnlPercentText = pnlPercent !== null ? formatPercent(pnlPercent) : "";
+    const pnlTone = pnl === null ? "neutral" : (pnl >= 0 ? "positive" : "negative");
+    const weight = current !== null && totalCurrent > 0 ? (current / totalCurrent) * 100 : null;
+    const weightText = weight !== null ? `${points.format(weight)}%` : "—";
+    const quoteTime = quote?.asOf ? ` · ${formatDate(quote.asOf)}` : "";
+
+    const tr = document.createElement("tr");
+    tr.className = "wallet-row asset-row";
+    tr.dataset.symbol = entry.symbol;
+    tr.title = quote
+      ? `Clique para ver o gráfico diário${quoteTime}`
+      : "Clique para ver o gráfico diário";
+    tr.innerHTML = `
+      <td>
+        <span class="asset-cell">
+          <button type="button" class="wallet-star" data-symbol="${escapeHTML(entry.symbol)}" data-name="${escapeHTML(entry.name)}" aria-pressed="true" aria-label="Remover ${escapeHTML(entry.symbol)} da carteira">★</button>
+          <span class="asset-id">
+            <span class="symbol">${escapeHTML(entry.symbol)}</span>
+            <span class="asset-name" title="${escapeHTML(entry.name || entry.symbol)}">${escapeHTML(entry.name || "—")}</span>
+          </span>
+        </span>
+      </td>
+      <td>${escapeHTML(priceText)}</td>
+      <td><span class="change ${tone}">${escapeHTML(changeText)}</span></td>
+      <td>${escapeHTML(quantityText)}</td>
+      <td>${escapeHTML(averageText)}</td>
+      <td>${escapeHTML(investedText)}</td>
+      <td>${escapeHTML(currentText)}</td>
+      <td>
+        <span class="wallet-pnl ${pnlTone}">${escapeHTML(pnlText)}</span>
+        ${pnlPercentText ? `<span class="wallet-pnl-meta ${pnlTone}">${escapeHTML(pnlPercentText)}</span>` : ""}
+      </td>
+      <td>${escapeHTML(weightText)}</td>
+      <td>
+        <span class="wallet-row-actions">
+          <button type="button" class="wallet-edit" data-symbol="${escapeHTML(entry.symbol)}">Editar</button>
+          <button type="button" class="wallet-remove" data-symbol="${escapeHTML(entry.symbol)}">Remover</button>
+        </span>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  return table;
+}
+
+function renderWallet() {
+  if (!walletEl) {
+    return;
+  }
+
+  if (activeMode === "wallet") {
+    modeDescriptionEl.textContent = modeDescription("wallet");
+  }
+
+  const assets = snapshotAssetMap();
+  const rows = walletRows(assets);
+  const positions = rows.filter((row) => row.isPosition);
+  const investedComplete = positions.length > 0 && positions.every((row) => row.invested !== null);
+  const currentComplete = positions.length > 0 && positions.every((row) => row.current !== null);
+  const invested = positions.reduce((total, row) => total + (row.invested || 0), 0);
+  const current = currentComplete
+    ? positions.reduce((total, row) => total + (row.current || 0), 0)
+    : null;
+  const pnl = investedComplete && current !== null ? current - invested : null;
+  const pnlPercent = pnl !== null && invested > 0 ? (pnl / invested) * 100 : null;
+  const pnlTone = pnl === null ? "neutral" : (pnl >= 0 ? "positive" : "negative");
+
+  walletSummaryEl.replaceChildren(
+    walletStat(
+      "Investido",
+      invested > 0 && investedComplete ? formatMoney(invested) : "—",
+      positions.length === 0 ? "nenhuma posição" : (investedComplete ? `${positions.length} ${positions.length === 1 ? "posição" : "posições"}` : "preencha o preço médio"),
+    ),
+    walletStat(
+      "Valor atual",
+      current !== null ? formatMoney(current) : "—",
+      positions.length === 0 ? "só watchlist" : (currentComplete ? "preços mais recentes" : "aguardando cotação"),
+    ),
+    walletStat(
+      "Resultado",
+      pnl === null ? "—" : formatMoney(pnl),
+      pnlPercent === null ? "sem dados completos" : formatPercent(pnlPercent),
+      pnlTone,
+    ),
+    walletStat("Ativos", String(wallet.length), `${positions.length} na carteira · ${wallet.length - positions.length} na watchlist`),
+  );
+
+  const empty = wallet.length === 0;
+  walletTableWrapEl.hidden = empty;
+  walletEmptyEl.hidden = !empty;
+  walletExportEl.disabled = empty;
+  walletLinkEl.disabled = empty;
+
+  if (empty) {
+    walletTableWrapEl.replaceChildren();
+    return;
+  }
+
+  walletTableWrapEl.replaceChildren(walletTable(rows));
+}
+
+function openWalletEditor(symbol) {
+  const entry = findWalletEntry(symbol);
+  if (!entry) {
+    return;
+  }
+
+  walletEditSymbol = symbol;
+  walletEditTitleEl.textContent = entry.name || symbol;
+  walletEditSymbolEl.textContent = symbol;
+  walletEditQuantityEl.value = entry.quantity > 0 ? String(entry.quantity).replace(".", ",") : "";
+  walletEditAverageEl.value = entry.averagePrice > 0 ? String(entry.averagePrice).replace(".", ",") : "";
+  walletEditErrorEl.hidden = true;
+  walletEditErrorEl.textContent = "";
+
+  if (typeof walletEditDialogEl.showModal === "function") {
+    walletEditDialogEl.showModal();
+  } else {
+    walletEditDialogEl.setAttribute("open", "");
+  }
+  walletEditQuantityEl.focus();
+}
+
+function closeWalletEditor() {
+  walletEditSymbol = "";
+  if (typeof walletEditDialogEl.close === "function") {
+    walletEditDialogEl.close();
+  } else {
+    walletEditDialogEl.removeAttribute("open");
+  }
+}
+
+function saveWalletEditor(event) {
+  event.preventDefault();
+  const entry = findWalletEntry(walletEditSymbol);
+  if (!entry) {
+    closeWalletEditor();
+    return;
+  }
+
+  const quantity = parseWalletNumber(walletEditQuantityEl.value);
+  const averagePrice = parseWalletNumber(walletEditAverageEl.value);
+
+  if (quantity > 0 && averagePrice <= 0) {
+    walletEditErrorEl.textContent = "Informe o preço médio para calcular o resultado da posição.";
+    walletEditErrorEl.hidden = false;
+    walletEditAverageEl.focus();
+    return;
+  }
+
+  entry.quantity = quantity;
+  entry.averagePrice = quantity > 0 ? averagePrice : 0;
+  saveWallet();
+  closeWalletEditor();
+  renderWallet();
+  setWalletStatus(
+    entry.quantity > 0
+      ? `${entry.symbol}: posição de ${formatQuantity(entry.quantity)} @ ${formatMoney(entry.averagePrice)}.`
+      : `${entry.symbol} mantido apenas na watchlist.`,
+    "success",
+  );
+}
+
+function removeWalletEntry(symbol) {
+  const entry = findWalletEntry(symbol);
+  if (!entry) {
+    return;
+  }
+
+  if (entry.quantity > 0 && !window.confirm(`Remover ${symbol} da carteira? A posição será perdida.`)) {
+    return;
+  }
+
+  wallet = wallet.filter((item) => item.symbol !== symbol);
+  saveWallet();
+  updateWalletStars(symbol);
+  renderWallet();
+  setWalletStatus(`${symbol} removido da carteira.`, "success");
+  showToast(`${symbol} removido da carteira.`, "success");
+}
+
+function toggleWallet(symbol, name) {
+  const entry = findWalletEntry(symbol);
+  if (entry) {
+    removeWalletEntry(symbol);
+    return;
+  }
+
+  const snapshot = snapshotAssetMap().get(symbol);
+  wallet.push({
+    symbol,
+    name: name || snapshot?.name || "",
+    quantity: 0,
+    averagePrice: 0,
+    lastPrice: Number(snapshot?.price) || 0,
+    lastChange: Number(snapshot?.change) || 0,
+    lastAsOf: lastSnapshot?.generatedAt || "",
+    addedAt: new Date().toISOString(),
+  });
+  saveWallet();
+  updateWalletStars(symbol);
+  if (activeMode === "wallet") {
+    renderWallet();
+  }
+  setWalletStatus(`${symbol} adicionado. Use Editar para definir quantidade e preço médio.`, "success");
+  showToast(`${symbol} adicionado à carteira.`, "success");
+  void hydrateWalletEntry(symbol).then(() => {
+    if (activeMode === "wallet") {
+      renderWallet();
+    }
+  }).catch(() => {
+    setWalletStatus(`${symbol} adicionado, mas a cotação ainda não está disponível.`, "error");
+  });
+}
+
+async function addWalletSymbol(raw, knownName = "") {
+  const symbol = normalizeWalletSymbol(raw);
+  if (!isValidWalletSymbol(symbol)) {
+    setWalletStatus("Ticker inválido. Use o formato PETR4, BOVA11 ou AAPL34.", "error");
+    return;
+  }
+  if (isInWallet(symbol)) {
+    setWalletStatus(`${symbol} já está na carteira.`, "error");
+    return;
+  }
+
+  const snapshot = snapshotAssetMap().get(symbol);
+  wallet.push({
+    symbol,
+    name: snapshot?.name || String(knownName || "").trim(),
+    quantity: 0,
+    averagePrice: 0,
+    lastPrice: Number(snapshot?.price) || 0,
+    lastChange: Number(snapshot?.change) || 0,
+    lastAsOf: lastSnapshot?.generatedAt || "",
+    addedAt: new Date().toISOString(),
+  });
+  saveWallet();
+  updateWalletStars(symbol);
+  renderWallet();
+  setWalletStatus(`Adicionado ${symbol}. Use Editar para definir quantidade e preço médio.`, "success");
+
+  if (!snapshot) {
+    try {
+      await hydrateWalletEntry(symbol);
+      renderWallet();
+    } catch {
+      setWalletStatus(`${symbol} adicionado, mas a cotação ainda não está disponível.`, "error");
+    }
+  }
+}
+
+function walletAssetsFromFile(payload) {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.assets)
+      ? payload.assets
+      : Array.isArray(payload?.wallet)
+        ? payload.wallet
+        : Array.isArray(payload?.carteira)
+          ? payload.carteira
+          : [];
+
+  const entries = [];
+  for (const item of items) {
+    const source = typeof item === "string" ? { symbol: item } : item;
+    const entry = normalizeWalletEntry(source);
+    if (entry) {
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
+function exportWallet() {
+  if (wallet.length === 0) {
+    setWalletStatus("Adicione ativos antes de exportar.", "error");
+    return;
+  }
+
+  const assets = wallet.map((entry) => ({
+    symbol: entry.symbol,
+    name: entry.name,
+    quantity: entry.quantity,
+    averagePrice: entry.averagePrice,
+  }));
+  const payload = {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    carteira: "Carteira",
+    assets,
+  };
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `stckcraw-carteira-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  setWalletStatus(`Carteira exportada com ${assets.length} ${assets.length === 1 ? "ativo" : "ativos"}.`, "success");
+}
+
+async function importWalletFile(file) {
+  try {
+    const entries = walletAssetsFromFile(JSON.parse(await file.text()));
+    if (entries.length === 0) {
+      setWalletStatus("O arquivo não contém ativos válidos.", "error");
+      return;
+    }
+
+    let added = 0;
+    let updated = 0;
+    for (const incoming of entries) {
+      const existing = findWalletEntry(incoming.symbol);
+      if (existing) {
+        if (!existing.name && incoming.name) {
+          existing.name = incoming.name;
+        }
+        if (incoming.quantity > 0) {
+          existing.quantity = incoming.quantity;
+          existing.averagePrice = incoming.averagePrice;
+        }
+        updated += 1;
+      } else {
+        wallet.push(incoming);
+        added += 1;
+      }
+    }
+
+    saveWallet();
+    for (const entry of wallet) {
+      updateWalletStars(entry.symbol);
+    }
+    renderWallet();
+    setWalletStatus(
+      `${added} ${added === 1 ? "ativo adicionado" : "ativos adicionados"} · ${updated} ${updated === 1 ? "atualizado" : "atualizados"}.`,
+      "success",
+    );
+    void refreshWalletQuotes();
+  } catch {
+    setWalletStatus("Arquivo inválido. Selecione um JSON exportado pela carteira.", "error");
+  }
+}
+
+async function copyWalletLink() {
+  if (wallet.length === 0) {
+    setWalletStatus("Adicione ativos antes de copiar o link.", "error");
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = "";
+  url.searchParams.set("carteira", wallet.map((entry) => entry.symbol).sort().join(","));
+
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("clipboard unavailable");
+    }
+    await navigator.clipboard.writeText(url.toString());
+    setWalletStatus("Link copiado. Ele importa os tickers como watchlist, sem quantidades.", "success");
+  } catch {
+    window.prompt("Copie o link da carteira:", url.toString());
+    setWalletStatus("Não foi possível copiar automaticamente; use o link exibido.", "error");
+  }
+}
+
+function applySharedWallet() {
+  const url = new URL(window.location.href);
+  const raw = url.searchParams.get("carteira") || url.searchParams.get("wallet");
+  if (!raw) {
+    return;
+  }
+
+  const symbols = raw.split(",")
+    .map(normalizeWalletSymbol)
+    .filter(isValidWalletSymbol);
+  url.searchParams.delete("carteira");
+  url.searchParams.delete("wallet");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+
+  if (symbols.length === 0) {
+    return;
+  }
+
+  let added = 0;
+  for (const symbol of symbols) {
+    if (!isInWallet(symbol)) {
+      wallet.push({
+        symbol,
+        name: "",
+        quantity: 0,
+        averagePrice: 0,
+        lastPrice: 0,
+        lastChange: 0,
+        lastAsOf: "",
+        addedAt: new Date().toISOString(),
+      });
+      added += 1;
+    }
+  }
+  if (added > 0) {
+    saveWallet();
+  }
+  for (const entry of wallet) {
+    updateWalletStars(entry.symbol);
+  }
+
+  activeMode = "wallet";
+  saveActiveMode(activeMode);
+  applyModeState();
+  renderActiveGroups();
+  setWalletStatus(`${symbols.length} ${symbols.length === 1 ? "ativo importado" : "ativos importados"} do link como watchlist.`, "success");
+  void refreshWalletQuotes();
+}
+
+function openWalletChart(entry, trigger) {
+  const quote = walletQuoteFor(entry, snapshotAssetMap());
+  const chart = {
+    key: `asset:${entry.symbol}`,
+    label: entry.symbol,
+    symbol: quote?.name || entry.name || entry.symbol,
+    price: quote?.price ?? entry.lastPrice,
+    change: quote?.change ?? entry.lastChange,
+    timezone: "America/Sao_Paulo",
+    history: Array.isArray(quote?.history) ? quote.history : [],
+  };
+
+  if (chart.history.length >= 2) {
+    openChart(chart, trigger);
+    return;
+  }
+
+  openChart({ ...chart, loading: true }, trigger);
+  fetchAssetHistory(entry.symbol)
+    .then((history) => {
+      if (activeChartKey !== chart.key) {
+        return;
+      }
+      chart.history = history;
+      renderChart(chart);
+    })
+    .catch((error) => {
+      if (activeChartKey === chart.key) {
+        renderChart({ ...chart, historyError: error.message });
+      }
+    });
+}
+
+function hideWalletSuggestions() {
+  if (!walletSuggestionsEl) {
+    return;
+  }
+  walletSuggestionsEl.hidden = true;
+  walletSuggestionsEl.replaceChildren();
+  walletAddInputEl?.setAttribute("aria-expanded", "false");
+  walletAddInputEl?.removeAttribute("aria-activedescendant");
+  walletSearchIndex = -1;
+}
+
+function showWalletSuggestions() {
+  if (!walletSuggestionsEl) {
+    return;
+  }
+  walletSuggestionsEl.hidden = false;
+  walletAddInputEl?.setAttribute("aria-expanded", "true");
+}
+
+function showWalletSearchMessage(message) {
+  walletSearchItems = [];
+  walletSearchIndex = -1;
+  if (!walletSuggestionsEl) {
+    return;
+  }
+  const empty = document.createElement("p");
+  empty.className = "wallet-suggestion-empty";
+  empty.textContent = message;
+  walletSuggestionsEl.replaceChildren(empty);
+  showWalletSuggestions();
+}
+
+function renderWalletSuggestions(items, query) {
+  walletSearchItems = items;
+  walletSearchIndex = -1;
+  if (!walletSuggestionsEl) {
+    return;
+  }
+
+  if (items.length === 0) {
+    showWalletSearchMessage(`Nenhum ativo encontrado para “${query}”.`);
+    return;
+  }
+
+  walletSuggestionsEl.replaceChildren();
+  items.forEach((item, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "search-result wallet-suggestion";
+    option.id = `wallet-suggestion-${index}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.innerHTML = `
+      <span class="search-result-main">
+        <span class="search-result-symbol">${escapeHTML(item.symbol)}</span>
+        <span class="search-result-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
+        <span class="search-result-type">${escapeHTML(item.type)}</span>
+      </span>
+      <span class="search-result-side">
+        <strong class="search-result-price">${escapeHTML(formatMoney(item.price))}</strong>
+        <span class="search-result-change ${changeTone(item.change)}">${escapeHTML(formatPercent(item.change))}</span>
+      </span>`;
+    option.addEventListener("click", () => selectWalletSuggestion(item));
+    walletSuggestionsEl.appendChild(option);
+  });
+
+  showWalletSuggestions();
+  walletAddInputEl?.removeAttribute("aria-activedescendant");
+}
+
+function setActiveWalletSuggestion(index) {
+  const options = Array.from(walletSuggestionsEl?.querySelectorAll(".wallet-suggestion") || []);
+  walletSearchIndex = index;
+  options.forEach((option, position) => {
+    const active = position === index;
+    option.classList.toggle("active", active);
+    option.setAttribute("aria-selected", String(active));
+  });
+
+  if (index >= 0 && options[index]) {
+    walletAddInputEl.setAttribute("aria-activedescendant", options[index].id);
+    options[index].scrollIntoView({ block: "nearest" });
+  } else {
+    walletAddInputEl.removeAttribute("aria-activedescendant");
+  }
+}
+
+function scheduleWalletSearch(rawQuery) {
+  const query = rawQuery.trim().replace(/\s+/g, " ");
+  window.clearTimeout(walletSearchTimer);
+  walletSearchController?.abort();
+
+  if (query.length < 2) {
+    walletSearchItems = [];
+    hideWalletSuggestions();
+    return;
+  }
+
+  walletSearchTimer = window.setTimeout(() => {
+    void runWalletSearch(query);
+  }, SEARCH_TIMEOUT_MS);
+}
+
+async function runWalletSearch(query) {
+  const cacheKey = query.toLowerCase();
+  const cached = walletSearchCache.get(cacheKey);
+  if (cached) {
+    if (query.toLowerCase() === walletAddInputEl.value.trim().toLowerCase()) {
+      renderWalletSuggestions(cached, query);
+    }
+    return;
+  }
+
+  if (typeof AbortController === "function") {
+    walletSearchController?.abort();
+    walletSearchController = new AbortController();
+  }
+  showWalletSearchMessage("Buscando ativos…");
+
+  try {
+    const params = new URLSearchParams({
+      search: query,
+      limit: String(SEARCH_LIMIT),
+    });
+    const response = await fetch(`${SEARCH_URL}?${params}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: walletSearchController?.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const assets = (Array.isArray(payload.stocks) ? payload.stocks : [])
+      .filter((asset) => !String(asset.stock || "").toUpperCase().endsWith("F"))
+      .slice(0, 8)
+      .map((asset) => searchResultItem(asset));
+
+    if (walletSearchCache.size > 40) {
+      walletSearchCache.delete(walletSearchCache.keys().next().value);
+    }
+    walletSearchCache.set(cacheKey, assets);
+
+    if (query.toLowerCase() !== walletAddInputEl.value.trim().toLowerCase()) {
+      return;
+    }
+    renderWalletSuggestions(assets, query);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      return;
+    }
+    if (query.toLowerCase() === walletAddInputEl.value.trim().toLowerCase()) {
+      showWalletSearchMessage(`Busca indisponível: ${error.message}`);
+    }
+  }
+}
+
+function selectWalletSuggestion(item) {
+  const symbol = normalizeWalletSymbol(item?.symbol);
+  if (!isValidWalletSymbol(symbol)) {
+    return;
+  }
+
+  walletAddInputEl.value = "";
+  hideWalletSuggestions();
+
+  if (isInWallet(symbol)) {
+    setWalletStatus(`${symbol} já está na carteira.`, "error");
+    openWalletEditor(symbol);
+    return;
+  }
+
+  void addWalletSymbol(symbol, item?.name || "");
+}
+
+function bindWallet() {
+  walletAddFormEl?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (walletSearchIndex >= 0 && walletSearchItems[walletSearchIndex]) {
+      selectWalletSuggestion(walletSearchItems[walletSearchIndex]);
+      return;
+    }
+    const value = walletAddInputEl.value;
+    walletAddInputEl.value = "";
+    hideWalletSuggestions();
+    void addWalletSymbol(value);
+  });
+
+  walletAddInputEl?.addEventListener("input", () => {
+    scheduleWalletSearch(walletAddInputEl.value);
+  });
+
+  walletAddInputEl?.addEventListener("focus", () => {
+    if (walletAddInputEl.value.trim().length >= 2 && walletSearchItems.length > 0) {
+      showWalletSuggestions();
+    }
+  });
+
+  walletAddInputEl?.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      if (walletSearchItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      setActiveWalletSuggestion((walletSearchIndex + 1) % walletSearchItems.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      if (walletSearchItems.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      const previous = walletSearchIndex <= 0 ? walletSearchItems.length - 1 : walletSearchIndex - 1;
+      setActiveWalletSuggestion(previous);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      if (walletSearchIndex >= 0 && walletSearchItems[walletSearchIndex]) {
+        event.preventDefault();
+        selectWalletSuggestion(walletSearchItems[walletSearchIndex]);
+      }
+      return;
+    }
+
+    if (event.key === "Escape" && !walletSuggestionsEl?.hidden) {
+      event.preventDefault();
+      hideWalletSuggestions();
+    }
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (walletSuggestionsEl && !walletAddFormEl?.contains(event.target)) {
+      hideWalletSuggestions();
+    }
+  });
+
+  walletExportEl?.addEventListener("click", exportWallet);
+  walletImportEl?.addEventListener("click", () => walletFileEl?.click());
+  walletFileEl?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) {
+      await importWalletFile(file);
+    }
+  });
+  walletLinkEl?.addEventListener("click", () => {
+    void copyWalletLink();
+  });
+
+  walletEditFormEl?.addEventListener("submit", saveWalletEditor);
+  walletEditCloseEl?.addEventListener("click", closeWalletEditor);
+  walletEditCancelEl?.addEventListener("click", closeWalletEditor);
+  walletEditDialogEl?.addEventListener("click", (event) => {
+    if (event.target === walletEditDialogEl) {
+      closeWalletEditor();
+    }
+  });
+  walletEditDialogEl?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeWalletEditor();
+  });
+
+  walletTableWrapEl?.addEventListener("click", (event) => {
+    const edit = event.target.closest(".wallet-edit");
+    if (edit) {
+      event.stopPropagation();
+      openWalletEditor(edit.dataset.symbol);
+      return;
+    }
+    const remove = event.target.closest(".wallet-remove");
+    if (remove) {
+      event.stopPropagation();
+      removeWalletEntry(remove.dataset.symbol);
+      return;
+    }
+    const star = event.target.closest(".wallet-star");
+    if (star) {
+      event.stopPropagation();
+      removeWalletEntry(star.dataset.symbol);
+      return;
+    }
+    const row = event.target.closest(".wallet-row");
+    if (row) {
+      const entry = findWalletEntry(row.dataset.symbol);
+      if (entry) {
+        openWalletChart(entry, row);
+      }
+    }
+  });
+}
+
 function renderActiveGroups() {
+  const isWallet = activeMode === "wallet";
+  if (walletEl) {
+    walletEl.hidden = !isWallet;
+    if (isWallet) {
+      walletEl.classList.add("visible");
+    }
+  }
+  highlightsEl.hidden = isWallet;
+  groupsEl.hidden = isWallet;
+
+  if (isWallet) {
+    modeDescriptionEl.textContent = modeDescription("wallet");
+    renderWallet();
+    if (lastSnapshot) {
+      void refreshWalletQuotes();
+    }
+    return;
+  }
+
+  hideWalletSuggestions();
+
   if (!lastSnapshot) {
     return;
   }
@@ -1345,6 +2534,11 @@ function renderActiveGroups() {
 }
 
 function modeDescription(mode) {
+  if (mode === "wallet") {
+    const positions = wallet.filter((entry) => entry.quantity > 0).length;
+    return `${wallet.length} ${wallet.length === 1 ? "ativo" : "ativos"} · ${positions} ${positions === 1 ? "posição" : "posições"}`;
+  }
+
   const config = MODES[mode] || MODES.highs;
   const period = lastSnapshot?.b3Closed ? "do último pregão" : "do dia";
   return `Top 10 maiores ${config.coverage} ${period}`;
@@ -1356,14 +2550,8 @@ function setMode(mode) {
   }
 
   activeMode = mode;
-  if (modeSwitchEl) {
-    modeSwitchEl.dataset.mode = mode;
-  }
-  for (const button of modeButtons) {
-    const isActive = button.dataset.mode === mode;
-    button.classList.toggle("active", isActive);
-    button.setAttribute("aria-selected", String(isActive));
-  }
+  saveActiveMode(mode);
+  applyModeState();
   renderActiveGroups();
 }
 
@@ -1568,6 +2756,10 @@ async function fetchLiveSnapshot(previousIndices = [], previousSnapshot = null) 
 async function load({ manual = false, forceLive = false } = {}) {
   if (loading) {
     return;
+  }
+
+  if (manual || forceLive) {
+    walletQuotes.clear();
   }
 
   setLoading(true);
@@ -2117,6 +3309,13 @@ window.setInterval(() => {
     updateStatus(lastSnapshot);
   }
 }, 60_000);
+
+wallet = loadWallet();
+activeMode = loadActiveMode();
+applyModeState();
+bindWallet();
+applySharedWallet();
+renderActiveGroups();
 
 initReveal();
 initMarketParticles();

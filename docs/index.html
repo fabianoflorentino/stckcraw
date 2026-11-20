@@ -12,7 +12,7 @@
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="style.css?v=32">
+  <link rel="stylesheet" href="style.css?v=35">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
@@ -57,10 +57,11 @@
 
   <section class="toolbar reveal" aria-label="Direção da variação">
     <div class="toolbar-start">
-      <div class="mode-switch" role="tablist" aria-label="Altas ou baixas" data-mode="highs">
+      <div class="mode-switch" role="tablist" aria-label="Altas, baixas ou carteira" data-mode="highs">
         <span class="mode-indicator" aria-hidden="true"></span>
         <button type="button" class="mode-button active" data-mode="highs" role="tab" aria-selected="true" aria-controls="groups">Altas</button>
         <button type="button" class="mode-button" data-mode="lows" role="tab" aria-selected="false" aria-controls="groups">Baixas</button>
+        <button type="button" class="mode-button" data-mode="wallet" role="tab" aria-selected="false" aria-controls="wallet">Carteira</button>
       </div>
       <div class="asset-search" id="asset-search-root">
         <button id="search-toggle" class="search-toggle" type="button"
@@ -84,6 +85,35 @@
 
   <section id="indices" class="indices reveal" aria-label="Índices de mercado"></section>
   <section id="highlights" class="highlights reveal" aria-label="Destaques"></section>
+  <section id="wallet" class="wallet reveal" aria-label="Carteira" hidden>
+    <div id="wallet-summary" class="wallet-summary"></div>
+
+    <div class="wallet-panel">
+      <form id="wallet-add-form" class="wallet-add" autocomplete="off">
+        <div class="wallet-search">
+          <input id="wallet-add-input" class="wallet-input" type="text" placeholder="Ticker — ex.: PETR4"
+            aria-label="Ticker para adicionar à carteira" spellcheck="false"
+            role="combobox" aria-expanded="false" aria-controls="wallet-suggestions" aria-autocomplete="list">
+          <div id="wallet-suggestions" class="search-results wallet-suggestions" role="listbox"
+            aria-label="Sugestões de ativos" aria-live="polite" hidden></div>
+        </div>
+        <button class="button button-primary" type="submit">Adicionar</button>
+      </form>
+      <div class="wallet-actions">
+        <button id="wallet-export" class="button button-ghost" type="button">Exportar</button>
+        <button id="wallet-import" class="button button-ghost" type="button">Importar</button>
+        <button id="wallet-link" class="button button-ghost" type="button">Copiar link</button>
+        <input id="wallet-file" type="file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+
+    <p id="wallet-status" class="wallet-status" role="status" aria-live="polite"></p>
+    <p class="scroll-hint wallet-scroll-hint">deslize a tabela →</p>
+    <div id="wallet-table-wrap" class="wallet-table-wrap table-wrap" hidden></div>
+    <p id="wallet-empty" class="wallet-empty">
+      Sua carteira está vazia. Use a estrela nas tabelas de altas/baixas ou adicione um ticker acima.
+    </p>
+  </section>
   <main id="groups" class="groups reveal" aria-live="polite"></main>
 
   <footer class="footer">
@@ -101,8 +131,37 @@
   </button>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="wallet-edit" class="wallet-dialog" aria-labelledby="wallet-edit-title">
+    <form id="wallet-edit-form" class="wallet-form">
+      <div class="wallet-form-head">
+        <div>
+          <p class="chart-eyebrow">Carteira</p>
+          <h2 id="wallet-edit-title" class="chart-title">Editar ativo</h2>
+          <p id="wallet-edit-symbol" class="wallet-form-symbol"></p>
+        </div>
+        <button id="wallet-edit-close" class="chart-close" type="button" aria-label="Fechar">×</button>
+      </div>
+
+      <label class="wallet-field">
+        <span>Quantidade</span>
+        <input id="wallet-edit-quantity" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
+      </label>
+      <label class="wallet-field">
+        <span>Preço médio (R$)</span>
+        <input id="wallet-edit-average" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+      </label>
+      <p class="wallet-form-hint">Deixe os dois campos vazios para manter o ativo apenas na watchlist.</p>
+      <p id="wallet-edit-error" class="wallet-form-error" role="alert" hidden></p>
+
+      <div class="wallet-form-actions">
+        <button id="wallet-edit-cancel" class="button button-ghost" type="button">Cancelar</button>
+        <button class="button button-primary" type="submit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="index-chart" class="chart-dialog" aria-labelledby="index-chart-title"></dialog>
   <noscript>Ative o JavaScript para visualizar o dashboard.</noscript>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>
