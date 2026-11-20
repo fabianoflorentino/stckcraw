@@ -7,7 +7,8 @@
 Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas da B3 por tipo de ativo**. O site é atualizado a cada 30 minutos em dias úteis, das 10h às 18h (horário de Brasília), e publicado no GitHub Pages.
 
 **Demo:** https://fabianoflorentino.github.io/stckcraw/  
-**Workflow:** https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml
+**Workflow:** https://github.com/fabianoflorentino/stckcraw/actions/workflows/dashboard.yml  
+**Changelog:** [English](CHANGELOG.md) · [Português](CHANGELOG.pt-BR.md)
 
 ## O que tem
 
