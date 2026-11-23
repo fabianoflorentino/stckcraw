@@ -149,33 +149,63 @@
         </div>
       </div>
 
-      <ol class="project-timeline">
-        <li>
-          <time datetime="2026-11-23" data-i18n="projectTimeline1Date">23 nov 2026</time>
-          <strong data-i18n="projectTimeline1Title">Gráficos interativos</strong>
-          <span data-i18n="projectTimeline1Desc">Linha de referência segue o cursor com data, valor e variação no ponto; favoritos direto da busca e do gráfico.</span>
-        </li>
-        <li>
-          <time datetime="2026-11-19" data-i18n="projectTimeline2Date">19 nov 2026</time>
-          <strong data-i18n="projectTimeline2Title">Carteira local</strong>
-          <span data-i18n="projectTimeline2Desc">Watchlist e posições com P&amp;L, autocomplete, export/import e links compartilháveis.</span>
-        </li>
-        <li>
-          <time datetime="2026-11-19" data-i18n="projectTimeline3Date">19 nov 2026</time>
-          <strong data-i18n="projectTimeline3Title">Cotações e novo visual</strong>
-          <span data-i18n="projectTimeline3Desc">Dólar, euro, ouro, Brent, Bitcoin e S&amp;P 500 no hero, switch animado e superfícies translúcidas.</span>
-        </li>
-        <li>
-          <time datetime="2026-11-07" data-i18n="projectTimeline4Date">07 nov 2026</time>
-          <strong data-i18n="projectTimeline4Title">Destaques interativos</strong>
-          <span data-i18n="projectTimeline4Desc">Maior alta, maior queda e maior volume abrem o gráfico; cobertura expande as categorias.</span>
-        </li>
-        <li>
-          <time datetime="2026-11-03" data-i18n="projectTimeline5Date">03 nov 2026</time>
-          <strong data-i18n="projectTimeline5Title">Gráficos e busca</strong>
-          <span data-i18n="projectTimeline5Desc">Histórico diário de um mês para índices e ativos, busca em toda a B3 e modal mais fluido.</span>
-        </li>
-      </ol>
+      <div class="feature-carousel" data-feature-carousel>
+        <div id="features-viewport" class="feature-carousel-viewport" data-carousel-viewport tabindex="0" role="region" data-i18n-aria="featuresRegion" aria-label="Recursos do dashboard">
+          <div class="feature-carousel-track" data-carousel-track>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg>
+              </span>
+              <strong data-i18n="feature1Title">Altas e baixas</strong>
+              <span data-i18n="feature1Desc">Top 10 por variação do dia em ações, FIIs, FIPs, ETFs, BDRs e units, com uma visão para cada direção.</span>
+            </article>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
+              </span>
+              <strong data-i18n="feature2Title">Busca em toda a B3</strong>
+              <span data-i18n="feature2Desc">Encontre por ticker ou nome, favorite na hora e abra o gráfico com histórico carregado sob demanda.</span>
+            </article>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16"/><circle cx="16" cy="14" r="1"/></svg>
+              </span>
+              <strong data-i18n="feature3Title">Carteira e favoritos</strong>
+              <span data-i18n="feature3Desc">Watchlist, posições, preço médio, resultado, peso e export/import — tudo salvo no navegador.</span>
+            </article>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 3 4-6"/></svg>
+              </span>
+              <strong data-i18n="feature4Title">Gráficos interativos</strong>
+              <span data-i18n="feature4Desc">Fechamentos diários de um mês com linha de referência, data, valor e variação no ponto.</span>
+            </article>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.7 2.3 2.7 13.7 0 16"/><path d="M12 4c-2.7 2.3-2.7 13.7 0 16"/></svg>
+              </span>
+              <strong data-i18n="feature5Title">Mercado em contexto</strong>
+              <span data-i18n="feature5Desc">Ibovespa, Nasdaq, Euro Stoxx 50, Shanghai e cotações rápidas de dólar, ouro, Brent, Bitcoin e S&amp;P 500.</span>
+            </article>
+            <article class="feature-card" data-feature-card>
+              <span class="feature-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+              </span>
+              <strong data-i18n="feature6Title">Bilíngue e sempre atual</strong>
+              <span data-i18n="feature6Desc">PT-BR e EN-US com preferência salva, snapshot a cada 30 min e fallback direto no navegador.</span>
+            </article>
+          </div>
+        </div>
+
+        <div class="feature-carousel-footer">
+          <button type="button" class="feature-carousel-button" data-carousel-prev data-i18n-aria="featuresPrev" aria-controls="features-viewport" aria-label="Recursos anteriores">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <button type="button" class="feature-carousel-button" data-carousel-next data-i18n-aria="featuresNext" aria-controls="features-viewport" aria-label="Próximos recursos">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 

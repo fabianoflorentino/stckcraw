@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   intersection.
 - Wallet stars on search results and the chart header, so assets can be
   favorited without leaving the search or the chart.
+- Responsive feature carousel in the project section, replacing the static
+  timeline with six dashboard capabilities plus swipe, keyboard and
+  previous/next controls.
 - Project skill `stckcraw-dashboard-ui` documenting the dashboard UI
   conventions, i18n rules, validation steps and release ritual.
 

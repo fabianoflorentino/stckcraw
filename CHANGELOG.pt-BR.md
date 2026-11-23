@@ -15,6 +15,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   na interseção.
 - Estrela da carteira nos resultados de busca e no cabeçalho do gráfico, para
   favoritar ativos sem sair da busca ou do gráfico.
+- Carrossel responsivo de recursos na seção do projeto, substituindo a timeline
+  estática por seis capacidades do dashboard, com swipe, teclado e controles de
+  anterior/próximo.
 - Skill de projeto `stckcraw-dashboard-ui` com as convenções de UI, regras de
   i18n, validação e ritual de release do dashboard.
 

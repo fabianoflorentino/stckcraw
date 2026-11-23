@@ -32,7 +32,7 @@ validation; load the relevant Go skills when touching Go code.
 | File | Responsibility |
 |---|---|
 | `docs/app.js` | data loading, render functions, charts, search, wallet, i18n runtime |
-| `docs/index.html` | static shell, dialogs, forms, project timeline |
+| `docs/index.html` | static shell, dialogs, forms, project carousel |
 | `docs/style.css` | layout, responsive rules, chart and interaction styles |
 | `docs/i18n.js` | `pt-BR` and `en-US` dictionaries |
 | `docs/architecture.md` | architecture, decisions, limitations |
@@ -75,6 +75,14 @@ validation; load the relevant Go skills when touching Go code.
 - Validate edge behavior: first/last point, flat series, short series, narrow
   screens, and pointer leaving the plot area.
 
+## Carousel conventions
+
+- The project section uses one native scroll-snap carousel with six cards.
+- `--feature-per-view` drives 3 cards on desktop, 2 on tablet and 1 on mobile;
+  keep the card count divisible by 3, 2 and 1 when adding cards.
+- Navigation is previous/next only: no autoplay and no pagination dots.
+- Touch, keyboard, `aria-controls` and `prefers-reduced-motion` must work.
+
 ## Release ritual
 
 1. **Changelog, both languages.** Add a new dated section at the top of
@@ -84,9 +92,9 @@ validation; load the relevant Go skills when touching Go code.
    CI or deployment fixes that affected delivery.
 2. **README.** Update the "O que tem" bullets and the technical summary table
    when behavior, limits or commands change.
-3. **Project timeline.** For a user-visible delivery, add an entry to
-   `docs/index.html` and update the `projectTimeline*` keys in both locales.
-   Renumber existing keys when inserting a new entry.
+3. **Project carousel.** For a user-visible capability, update or add a card in
+   the `feature-carousel` in `docs/index.html` and the matching `feature*` keys
+   in both locales. Keep the six-card layout so pagination stays aligned.
 4. **Architecture.** Update `docs/architecture.md` when a decision, data flow,
    limitation or interaction model changes.
 5. **Workflow.** If CI or deploy behavior changed, update the changelog and the

@@ -22,6 +22,7 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
+- **Seção de projeto:** carrossel responsivo com os principais recursos do dashboard, com setas, swipe e teclado.
 - **Voltar ao topo:** botão flutuante com scroll suave.
 - **Atualização automática:** o site verifica o snapshot a cada 5 minutos; o workflow tenta gerar um novo a cada 30. Se o snapshot estiver velho ou ausente, o navegador consulta a brapi diretamente.
 - **Docker:** sobe o dashboard local com atualização a cada 30 minutos.

@@ -3267,6 +3267,104 @@ if (chartDialogEl) {
   });
 }
 
+function initFeatureCarousel() {
+  const carousel = document.querySelector("[data-feature-carousel]");
+  if (!carousel) {
+    return;
+  }
+
+  const viewport = carousel.querySelector("[data-carousel-viewport]");
+  const track = carousel.querySelector("[data-carousel-track]");
+  const prev = carousel.querySelector("[data-carousel-prev]");
+  const next = carousel.querySelector("[data-carousel-next]");
+  const cards = Array.from(track?.querySelectorAll("[data-feature-card]") || []);
+  if (!viewport || !track || !prev || !next || cards.length === 0) {
+    return;
+  }
+
+  let perView = 1;
+  let pageCount = 1;
+  let activePage = 0;
+  let scrollFrame = 0;
+  let resizeFrame = 0;
+
+  const getPerView = () => {
+    const raw = window.getComputedStyle(carousel).getPropertyValue("--feature-per-view").trim();
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  };
+
+  const getPageOffset = (page) => {
+    const target = cards[Math.min(cards.length - 1, Math.max(0, page * perView))];
+    return target ? Math.max(0, target.offsetLeft - cards[0].offsetLeft) : 0;
+  };
+
+  const scrollToPage = (page, smooth = true) => {
+    const targetPage = Math.min(Math.max(page, 0), pageCount - 1);
+    const left = getPageOffset(targetPage);
+    const behavior = smooth && !prefersReducedMotion ? "smooth" : "auto";
+    if (typeof viewport.scrollTo === "function") {
+      viewport.scrollTo({ left, behavior });
+    } else {
+      viewport.scrollLeft = left;
+    }
+  };
+
+  const updateControls = () => {
+    let nextPage = 0;
+    let bestDistance = Infinity;
+    for (let page = 0; page < pageCount; page += 1) {
+      const distance = Math.abs(getPageOffset(page) - viewport.scrollLeft);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nextPage = page;
+      }
+    }
+
+    activePage = nextPage;
+    prev.disabled = activePage <= 0;
+    next.disabled = activePage >= pageCount - 1;
+  };
+
+  const updateLayout = () => {
+    pageCount = Math.max(1, Math.ceil(cards.length / perView));
+    updateControls();
+  };
+
+  const refresh = () => {
+    perView = getPerView();
+    updateLayout();
+    scrollToPage(Math.min(activePage, pageCount - 1), false);
+    updateControls();
+  };
+
+  const scheduleRefresh = () => {
+    window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(refresh);
+  };
+
+  prev.addEventListener("click", () => {
+    scrollToPage(activePage - 1);
+  });
+
+  next.addEventListener("click", () => {
+    scrollToPage(activePage + 1);
+  });
+
+  viewport.addEventListener("scroll", () => {
+    window.cancelAnimationFrame(scrollFrame);
+    scrollFrame = window.requestAnimationFrame(updateControls);
+  }, { passive: true });
+
+  if ("ResizeObserver" in window) {
+    new ResizeObserver(scheduleRefresh).observe(viewport);
+  } else {
+    window.addEventListener("resize", scheduleRefresh);
+  }
+
+  refresh();
+}
+
 function initReveal() {
   const elements = Array.from(document.querySelectorAll(".reveal, .reveal-right"));
   if (prefersReducedMotion || !("IntersectionObserver" in window)) {
@@ -3655,6 +3753,7 @@ applySharedWallet();
 renderActiveGroups();
 
 initReveal();
+initFeatureCarousel();
 initMarketParticles();
 initMarketBackdrop();
 void load();
