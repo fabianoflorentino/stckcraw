@@ -6,6 +6,24 @@ so entries are grouped by the date the change landed.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-11-23
+
+### Added
+
+- Interactive crosshair on daily charts: a guide line follows the pointer and
+  shows the date, interpolated close and cumulative period change at the
+  intersection.
+- Wallet stars on search results and the chart header, so assets can be
+  favorited without leaving the search or the chart.
+- Project skill `stckcraw-dashboard-ui` documenting the dashboard UI
+  conventions, i18n rules, validation steps and release ritual.
+
+### Fixed
+
+- GitHub Pages publishing now uploads the artifact in the `update` job and
+  deploys it from a separate `deploy` job, avoiding the intermittent
+  `Found 0 artifact(s)` failure caused by artifact API eventual consistency.
+
 ## 2026-11-20
 
 ### Added

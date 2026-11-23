@@ -16,9 +16,9 @@ Crawler em Go que gera um dashboard estático com as **10 maiores altas e baixas
 - **Índices de mercado:** Ibovespa, Nasdaq, Euro Stoxx 50 e Shanghai, com valor, variação e horário da última cotação.
 - **Cotações rápidas:** Dólar, Euro, Ouro, Brent, Bitcoin e S&P 500 em cards compactos no topo do hero, com variação colorida (alta, baixa ou estável).
 - **PT-BR e EN-US:** PT-BR é o padrão; o seletor no hero ativa o inglês, salva a preferência no navegador e formata valores/datas no locale escolhido.
-- **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
-- **Carteira:** watchlist e posições com quantidade e preço médio, resultado em R$ e %, peso de cada ativo, export/import JSON e link compartilhável. Tudo fica no `localStorage`, sem conta ou servidor.
-- **Gráficos diários:** cada índice em destaque e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período.
+- **Busca de ativos:** busca por ticker ou nome em toda a B3; o resultado pode ser favoritado e abre o mesmo modal de gráfico, carregando o histórico sob demanda para ativos fora do top 10.
+- **Carteira:** watchlist e posições com quantidade e preço médio, resultado em R$ e %, peso de cada ativo, export/import JSON e link compartilhável. A estrela nas tabelas, na busca e no gráfico adiciona ativos à watchlist. Tudo fica no `localStorage`, sem conta ou servidor.
+- **Gráficos diários:** cada índice em destaque e cada ativo das tabelas traz um mini gráfico; clique na linha (ou no mini gráfico) para abrir o histórico diário do último mês, com mínimo, máximo e variação do período. No gráfico expandido, uma linha de referência acompanha o cursor e mostra data, valor e variação no ponto.
 - **Feriados da B3:** o snapshot marca `b3Closed` pelo horário do Ibovespa; quando a B3 não abre, o site mostra o último pregão e mantém os índices que operaram.
 - **Altas e Baixas:** uma aba para cada direção, com top 10 por variação do dia.
 - **Cards colapsáveis:** o cabeçalho inteiro do card recolhe/expande, com estado salvo no `localStorage`.
@@ -94,6 +94,7 @@ Resumo dos pacotes:
 ├── cloudflare/              # cron dispatcher + site estático opcional
 ├── docker/entrypoint.sh     # loop de atualização local
 ├── .github/workflows/       # agendamento e deploy
+├── .opencode/skills/        # skills de agentes para o projeto
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
@@ -273,6 +274,8 @@ O arquivo `docs/data/latest.json` é o único contrato entre o crawler e o front
 
 A carteira fica só no navegador, em `localStorage` na chave `stckcraw:wallet`. Cada ativo tem `symbol`, `name`, `quantity` e `averagePrice`; quantidade vazia significa watchlist. O modo ativo também é lembrado em `stckcraw:mode`.
 
+Nas tabelas, nos resultados da busca e no cabeçalho do gráfico, a estrela adiciona ou remove o ativo da watchlist sem sair da tela atual.
+
 Cotações vêm do snapshot quando o ativo está no top 10; fora dele, o frontend consulta o Worker `/quote` (Yahoo), com fallback para a busca da brapi, cache de 5 minutos e último valor salvo no próprio `localStorage`.
 
 Exportação:
@@ -299,9 +302,9 @@ O import faz união por ticker: ativos novos entram como watchlist ou posição;
 | Índices | Ibovespa (`^BVSP`), Nasdaq (`^IXIC`), Euro Stoxx 50 (`^STOXX50E`) e Shanghai (`000001.SS`) |
 | Cotações rápidas | Dólar (`BRL=X`), Euro (`EURBRL=X`), Ouro (`GC=F`), Brent (`BZ=F`), Bitcoin (`BTC-USD`) e S&P 500 (`^GSPC`) |
 | Horário dos índices | cada card mostra a última cotação no fuso da bolsa |
-| Gráficos | fechamentos diários de 1 mês para índices e ativos, em SVG nativo e sem biblioteca externa |
+| Gráficos | fechamentos diários de 1 mês para índices e ativos, em SVG nativo e sem biblioteca externa, com linha de referência interativa |
 | Histórico dos ativos | Yahoo Spark em lotes de até 20 símbolos `.SA`; ativos sem série ficam sem gráfico |
-| Preço vs. gráfico | preço/variação da tabela vêm da brapi; os fechamentos do gráfico vêm da Yahoo, então pequenas diferenças são esperadas |
+| Preço vs. gráfico | preço/variação da tabela vêm da brapi; os fechamentos do gráfico vêm da Yahoo, então pequenas diferenças são esperadas; entre dois pontos a linha é interpolada |
 | Ordenação | variação percentual do dia |
 | Volume | aproximado (`preço × quantidade`) |
 | Nasdaq/NYSE no CSV legado | não implementados |

@@ -400,6 +400,10 @@ function periodChange(points) {
   return (points[points.length - 1].close / points[0].close - 1) * 100;
 }
 
+const CHART_WIDTH = 640;
+const CHART_HEIGHT = 300;
+const CHART_PADDING = { top: 22, right: 18, bottom: 38, left: 96 };
+
 function chartScale(points, width, height, padding) {
   const closes = points.map((point) => point.close);
   const min = Math.min(...closes);
@@ -438,9 +442,9 @@ function buildSparkline(points, tone) {
 }
 
 function buildIndexChart(points, index, change) {
-  const width = 640;
-  const height = 300;
-  const padding = { top: 22, right: 18, bottom: 38, left: 96 };
+  const width = CHART_WIDTH;
+  const height = CHART_HEIGHT;
+  const padding = CHART_PADDING;
   const scale = chartScale(points, width, height, padding);
   const tone = changeTone(change);
   const baseline = height - padding.bottom;
@@ -477,6 +481,116 @@ function buildIndexChart(points, index, change) {
   const title = t("chartAriaTitle", { name: chartName });
 
   return `<svg class="index-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(title)}"><title>${escapeHTML(title)}</title>${grid.join("")}<path class="chart-area ${tone}" d="${area}"/><path class="chart-line ${tone}" d="${line}"/><circle class="chart-dot ${tone}" cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="5"/>${dateLabels.join("")}</svg>`;
+}
+
+function setupChartHover(canvas, points, index) {
+  const svg = canvas.querySelector(".index-chart-svg");
+  if (!svg || points.length < 2) {
+    return;
+  }
+
+  const scale = chartScale(points, CHART_WIDTH, CHART_HEIGHT, CHART_PADDING);
+  const overlay = document.createElement("div");
+  overlay.className = "chart-hover";
+  overlay.setAttribute("aria-hidden", "true");
+
+  const line = document.createElement("span");
+  line.className = "chart-hover-line";
+
+  const dot = document.createElement("span");
+  dot.className = "chart-hover-dot";
+
+  const tooltip = document.createElement("div");
+  tooltip.className = "chart-hover-tooltip";
+  const dateEl = document.createElement("span");
+  dateEl.className = "chart-hover-date";
+  const valueEl = document.createElement("strong");
+  valueEl.className = "chart-hover-value";
+  const changeEl = document.createElement("span");
+  changeEl.className = "chart-hover-change";
+  tooltip.append(dateEl, valueEl, changeEl);
+
+  overlay.append(line, dot, tooltip);
+  canvas.appendChild(overlay);
+
+  const hide = () => {
+    overlay.classList.remove("is-active");
+  };
+
+  const show = (event) => {
+    const svgRect = svg.getBoundingClientRect();
+    const overlayRect = overlay.getBoundingClientRect();
+    if (svgRect.width === 0 || svgRect.height === 0 || overlayRect.width === 0) {
+      return;
+    }
+
+    const scaleX = svgRect.width / CHART_WIDTH;
+    const scaleY = svgRect.height / CHART_HEIGHT;
+    const plotLeft = CHART_PADDING.left * scaleX;
+    const plotRight = (CHART_WIDTH - CHART_PADDING.right) * scaleX;
+    const pointerX = event.clientX - svgRect.left;
+    if (pointerX < plotLeft || pointerX > plotRight) {
+      hide();
+      return;
+    }
+
+    const ratio = (pointerX - plotLeft) / (plotRight - plotLeft);
+    const position = ratio * (points.length - 1);
+    const lowerIndex = Math.max(0, Math.min(points.length - 1, Math.floor(position)));
+    const upperIndex = Math.min(points.length - 1, lowerIndex + 1);
+    const fraction = position - lowerIndex;
+    const lower = points[lowerIndex];
+    const upper = points[upperIndex];
+    const close = lower.close + (upper.close - lower.close) * fraction;
+    const change = (close / points[0].close - 1) * 100;
+    const tone = changeTone(change);
+    const nearest = points[Math.round(position)] || lower;
+    const dotX = svgRect.left - overlayRect.left + pointerX;
+    const dotY = svgRect.top - overlayRect.top + scale.y(close) * scaleY;
+    const plotTop = svgRect.top - overlayRect.top + CHART_PADDING.top * scaleY;
+    const plotBottom = svgRect.top - overlayRect.top + (CHART_HEIGHT - CHART_PADDING.bottom) * scaleY;
+
+    line.style.left = `${dotX}px`;
+    line.style.top = `${plotTop}px`;
+    line.style.height = `${Math.max(0, plotBottom - plotTop)}px`;
+
+    dot.className = `chart-hover-dot ${tone}`;
+    dot.style.left = `${dotX}px`;
+    dot.style.top = `${dotY}px`;
+
+    dateEl.textContent = formatIndexChartDate(nearest.date, index.timezone);
+    valueEl.textContent = formatPoints(close);
+    changeEl.textContent = formatPercent(change);
+    changeEl.className = `chart-hover-change ${tone}`;
+
+    overlay.classList.add("is-active");
+
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+    let left = dotX + 12;
+    let top = dotY - tooltipHeight - 12;
+    if (left + tooltipWidth > overlayRect.width - 6) {
+      left = dotX - tooltipWidth - 12;
+    }
+    if (top < 6) {
+      top = dotY + 12;
+    }
+    if (top + tooltipHeight > overlayRect.height - 6) {
+      top = overlayRect.height - tooltipHeight - 6;
+    }
+    tooltip.style.left = `${Math.max(6, left)}px`;
+    tooltip.style.top = `${Math.max(6, top)}px`;
+  };
+
+  svg.addEventListener("pointermove", show);
+  svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("pointercancel", hide);
+  svg.addEventListener("pointerup", (event) => {
+    if (event.pointerType !== "mouse") {
+      hide();
+    }
+  });
 }
 
 function chartStat(label, value, tone = "neutral") {
@@ -607,6 +721,7 @@ function renderChart(index) {
   const canvas = document.createElement("div");
   canvas.className = "chart-canvas";
   canvas.innerHTML = buildIndexChart(points, index, change);
+  setupChartHover(canvas, points, index);
 
   const note = document.createElement("p");
   note.className = "chart-note";

@@ -291,7 +291,7 @@ flowchart TD
 
 ### Por que Yahoo para os índices?
 
-A API de chart da Yahoo entrega os quatro índices com uma única chamada por símbolo, sem autenticação, e inclui o horário, o fuso e os fechamentos diários do último mês. O frontend desenha esses pontos em SVG, sem biblioteca externa: o card mostra uma sparkline e o clique abre a janela com o gráfico completo. A desvantagem é que a Yahoo não envia CORS: o fallback do navegador não consegue atualizá-la, então os cards de índice usam o último snapshot gerado pelo Go. Como o Worker da Cloudflare mantém o snapshot fresco a cada 30 min, isso é suficiente para o painel.
+A API de chart da Yahoo entrega os quatro índices com uma única chamada por símbolo, sem autenticação, e inclui o horário, o fuso e os fechamentos diários do último mês. O frontend desenha esses pontos em SVG, sem biblioteca externa: o card mostra uma sparkline e o clique abre a janela com o gráfico completo e uma linha de referência que interpola os fechamentos diários. A desvantagem é que a Yahoo não envia CORS: o fallback do navegador não consegue atualizá-la, então os cards de índice usam o último snapshot gerado pelo Go. Como o Worker da Cloudflare mantém o snapshot fresco a cada 30 min, isso é suficiente para o painel.
 
 ### Por que Yahoo Spark para os ativos?
 
@@ -328,6 +328,7 @@ O dashboard prioriza simplicidade operacional. O modo CSV mantém a fonte InfoMo
 - O navegador não atualiza os índices no fallback porque a Yahoo não libera CORS; o histórico dos ativos é reaproveitado do snapshot anterior.
 - Ativos sem série diária na Yahoo ficam sem sparkline/gráfico; o restante do dashboard continua normal.
 - O preço e a variação da tabela vêm da brapi; o histórico do gráfico vem da Yahoo, então pode haver pequenas diferenças de fechamento/ajuste.
+- A leitura interativa do gráfico interpola os fechamentos diários; o valor entre dois pontos não representa uma cotação intradiária.
 - Feriados da B3 são detectados pelo `b3AsOf` do Ibovespa: o site mantém o último pregão e mostra o aviso, mas o workflow continua rodando para atualizar os índices que abriram.
 - O scheduler do GitHub é best effort; um gatilho externo via `workflow_dispatch` é o fallback.
 

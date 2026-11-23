@@ -6,6 +6,24 @@ as entradas são agrupadas pela data em que a mudança entrou.
 
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## 2026-11-23
+
+### Adicionado
+
+- Linha de referência interativa nos gráficos diários: uma guia acompanha o
+  cursor e mostra data, fechamento interpolado e variação acumulada no período
+  na interseção.
+- Estrela da carteira nos resultados de busca e no cabeçalho do gráfico, para
+  favoritar ativos sem sair da busca ou do gráfico.
+- Skill de projeto `stckcraw-dashboard-ui` com as convenções de UI, regras de
+  i18n, validação e ritual de release do dashboard.
+
+### Corrigido
+
+- A publicação no GitHub Pages agora envia o artifact no job `update` e faz o
+  deploy em um job `deploy` separado, evitando a falha intermitente
+  `Found 0 artifact(s)` causada pela consistência eventual da API de artifacts.
+
 ## 2026-11-20
 
 ### Adicionado

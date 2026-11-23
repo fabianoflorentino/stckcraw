@@ -1196,6 +1196,7 @@ h1 .hero-title-amp {
 }
 
 .chart-canvas {
+  position: relative;
   padding: 8px 8px 0;
   border: 1px solid rgba(35, 50, 82, 0.7);
   border-radius: 16px;
@@ -1206,6 +1207,8 @@ h1 .hero-title-amp {
   display: block;
   width: 100%;
   height: auto;
+  cursor: crosshair;
+  touch-action: pan-y;
 }
 
 .chart-grid {
@@ -1275,6 +1278,97 @@ h1 .hero-title-amp {
 
 .chart-dot.neutral {
   fill: var(--neutral);
+}
+
+.chart-hover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.chart-hover.is-active {
+  opacity: 1;
+}
+
+.chart-hover-line {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 1px dashed rgba(143, 162, 194, 0.65);
+  transform: translateX(-0.5px);
+}
+
+.chart-hover-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--neutral);
+  box-shadow: 0 0 0 2px var(--bg);
+  transform: translate(-50%, -50%);
+}
+
+.chart-hover-dot.positive {
+  background: var(--positive);
+}
+
+.chart-hover-dot.negative {
+  background: var(--negative);
+}
+
+.chart-hover-dot.neutral {
+  background: var(--neutral);
+}
+
+.chart-hover-tooltip {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 88px;
+  padding: 7px 9px;
+  border: 1px solid rgba(143, 162, 194, 0.35);
+  border-radius: 10px;
+  background: rgba(7, 13, 26, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.chart-hover-date {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.chart-hover-value {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-hover-change {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-hover-change.positive {
+  color: var(--positive);
+}
+
+.chart-hover-change.negative {
+  color: var(--negative);
+}
+
+.chart-hover-change.neutral {
+  color: var(--neutral);
 }
 
 .chart-note {
